@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,11 +153,7 @@ func meterStateFromRaw(lc l10n.Localizer, raw meter.State, loaded bool, now time
 func meterLimitMeters(lc l10n.Localizer, limits []meter.Limit, now time.Time) []runway.Meter {
 	rows := make([]runway.Meter, 0, len(limits))
 	for _, l := range limits {
-		title := l.Title
-		switch l.WindowMinutes {
-		case meter.FiveHourMinutes, meter.WeeklyMinutes, meter.MonthlyMinutes:
-			title = runway.WindowTitle(lc, l.WindowMinutes)
-		}
+		title := meterLimitTitle(lc, l)
 		w := runway.MeterWindow{WindowMinutes: l.WindowMinutes, ResetsAt: l.ResetsAt}
 		if l.HasPercent && !math.IsNaN(l.Percent) {
 			w.UsedPercent = int(math.Round(l.Percent))
@@ -168,6 +165,39 @@ func meterLimitMeters(lc l10n.Localizer, limits []meter.Limit, now time.Time) []
 		rows = append(rows, m)
 	}
 	return rows
+}
+
+// meterLimitTitle keeps a pool's own identity when it has one and localizes
+// bare window labels ("5h", "7d", "weekly", "monthly", "unknown", "<n>s/h/d")
+// to the standard window name.
+func meterLimitTitle(lc l10n.Localizer, l meter.Limit) string {
+	if l.Title != "" && !bareWindowLabel(l.Title) {
+		return l.Title
+	}
+	if l.WindowMinutes == 0 {
+		if l.Title != "" {
+			return l.Title
+		}
+		return lc.Text(l10n.KeyStatusUnknown)
+	}
+	return runway.WindowTitle(lc, l.WindowMinutes)
+}
+
+// bareWindowLabel reports whether a pool title is only a window name.
+func bareWindowLabel(title string) bool {
+	switch title {
+	case "5h", "7d", "weekly", "monthly", "unknown":
+		return true
+	}
+	digits := 0
+	for _, r := range title {
+		if r >= '0' && r <= '9' {
+			digits++
+			continue
+		}
+	}
+	unit := strings.TrimLeft(title, "0123456789")
+	return digits > 0 && (unit == "s" || unit == "h" || unit == "d" || unit == "mo")
 }
 
 // meterValueText is the "$used / $limit" caption of an amount pool; it is

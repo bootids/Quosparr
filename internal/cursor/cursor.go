@@ -97,20 +97,20 @@ func normalize(body []byte, now time.Time) (meter.State, error) {
 	if p, ok := s.IndividualUsage["plan"]; ok {
 		add("plan", "Plan", p)
 		if p.AutoPercentUsed != nil {
-			limits = append(limits, percentLimit("plan_auto", *p.AutoPercentUsed, reset, hasReset))
+			limits = append(limits, percentLimit("plan_auto", "Plan · Auto", *p.AutoPercentUsed, reset, hasReset))
 		}
 		if p.APIPercentUsed != nil {
-			limits = append(limits, percentLimit("plan_api", *p.APIPercentUsed, reset, hasReset))
+			limits = append(limits, percentLimit("plan_api", "Plan · API", *p.APIPercentUsed, reset, hasReset))
 		}
 	}
 	if p, ok := s.IndividualUsage["overall"]; ok {
-		add("overall", "", p)
+		add("overall", "Overall", p)
 	}
 	if p, ok := s.IndividualUsage["onDemand"]; ok && (p.Enabled == nil || *p.Enabled) {
-		add("on_demand", "", p)
+		add("on_demand", "On-demand", p)
 	}
 	if s.TeamUsage != nil && s.TeamUsage.Pooled != nil {
-		add("team_pooled", "", *s.TeamUsage.Pooled)
+		add("team_pooled", "Team", *s.TeamUsage.Pooled)
 	}
 	state.Limits = limits
 	return state, nil
@@ -139,8 +139,8 @@ func moneyLimit(id, title string, p pool) meter.Limit {
 }
 
 // percentLimit builds a monthly percent-only limit row.
-func percentLimit(id string, percent float64, reset time.Time, hasReset bool) meter.Limit {
-	return meter.Limit{ID: id, Unit: "percent", WindowMinutes: meter.MonthlyMinutes,
+func percentLimit(id, title string, percent float64, reset time.Time, hasReset bool) meter.Limit {
+	return meter.Limit{ID: id, Title: title, Unit: "percent", WindowMinutes: meter.MonthlyMinutes,
 		Used: meter.NaN(), LimitValue: meter.NaN(), Remaining: meter.NaN(),
 		Percent: percent, HasPercent: true, ResetsAt: reset, HasReset: hasReset}
 }

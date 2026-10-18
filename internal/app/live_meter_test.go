@@ -116,8 +116,9 @@ func TestMeterLimitMetersCarryValueText(t *testing.T) {
 	rows := meterLimitMeters(enLocalizer(), []meter.Limit{
 		{ID: "cost", Title: "Cost", Unit: "usd", WindowMinutes: meter.MonthlyMinutes, Used: 3.5, LimitValue: 20, Percent: 17.5, HasPercent: true},
 		{ID: "credits", Title: "Credits", Unit: "credits", Used: 12, LimitValue: 30},
+		{ID: "wk", Title: "7d", Unit: "percent", WindowMinutes: meter.WeeklyMinutes, Percent: 62.5, HasPercent: true},
 	}, now)
-	if len(rows) != 2 {
+	if len(rows) != 3 {
 		t.Fatalf("rows = %+v", rows)
 	}
 	if rows[0].ValueText != "$3.5 / $20" || rows[0].UsedPercent != 18 {
@@ -126,8 +127,11 @@ func TestMeterLimitMetersCarryValueText(t *testing.T) {
 	if rows[1].ValueText != "12 / 30" || rows[1].UsedPercent != 0 {
 		t.Fatalf("credits row = %+v", rows[1])
 	}
-	if rows[0].Title != enLocalizer().Text(l10n.KeyQuota) {
-		t.Fatalf("monthly title = %q", rows[0].Title)
+	if rows[0].Title != "Cost" {
+		t.Fatalf("pool identity title = %q, want Cost", rows[0].Title)
+	}
+	if rows[2].Title != enLocalizer().Text(l10n.KeyWeeklyUsage) {
+		t.Fatalf("bare window title = %q", rows[2].Title)
 	}
 }
 
