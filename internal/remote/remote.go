@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -126,10 +127,11 @@ func (c *Client) run(ctx context.Context, remoteCmd string) ([]byte, error) {
 }
 
 // FetchStatus runs `ssh ... <host> cat <dir>/status.json` and returns the
-// raw file bytes. The remote path is single-quoted so spaces and quotes
-// in Dir cannot break the command.
+// raw file bytes. The remote path keeps a leading tilde-prefix unquoted so
+// the remote shell expands it; everything after it is single-quoted so
+// spaces and quotes in Dir cannot break the command.
 func (c *Client) FetchStatus(ctx context.Context) ([]byte, error) {
-	return c.run(ctx, "cat "+quoteRemote(c.dir()+"/"+statusFile))
+	return c.run(ctx, "cat "+remotePath(c.dir()+"/"+statusFile))
 }
 
 // TestConnection runs the same ssh invocation with the remote command
@@ -138,6 +140,39 @@ func (c *Client) FetchStatus(ctx context.Context) ([]byte, error) {
 func (c *Client) TestConnection(ctx context.Context) error {
 	_, err := c.run(ctx, "true")
 	return err
+}
+
+// remotePath quotes a remote path for the remote shell. A path made only of
+// plain characters goes through bare (the common ~/.quosparr case, where a
+// quoted tilde would never expand). Any other path splits off an unquoted
+// tilde-prefix ("~/" or "~user/") and single-quotes the remainder.
+func remotePath(path string) string {
+	if isPlainRemotePath(path) {
+		return path
+	}
+	if i := strings.IndexByte(path, '/'); i > 0 && path[0] == '~' {
+		return path[:i+1] + quoteRemote(path[i+1:])
+	}
+	return quoteRemote(path)
+}
+
+// isPlainRemotePath reports whether path needs no quoting at all: no
+// whitespace, quotes, globs, or shell operators, and no leading dash that
+// could read as a cat option.
+func isPlainRemotePath(path string) bool {
+	if path == "" || path[0] == '-' {
+		return false
+	}
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '.' || c == '/' || c == '_' || c == '-' || c == '~' || c == '=' || c == ':' || c == '%' || c == '@' || c == '+':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // quoteRemote single-quotes s for the remote shell, escaping embedded

@@ -79,3 +79,8 @@ Handoff: out/20261018-ssh-remote-view/HANDOFF.md
 
 - 已交付：SSH 远程只读查看（快照拉取通路、全局数据源切换、状态栏+主面板+悬浮窗远端数据、设置页「远程数据源」含测试连接、写操作门控、七语言文案、AGENTS.md 隐私边界）。
 - 遗留（非本链验收项）：GUI 像素级与三端真机验收（锁屏/权限所限，走 docs/v1-acceptance-checklist.md 流程）；README/website 七语言功能与隐私说明随发布准备同步；RemoteService 构造后偏好变更（如语言）需重启生效；远端机器需手动开启「导出状态 JSON」。
+
+### 部署补记（2026-10-18 下午）
+
+- 实机部署发现 `quoteRemote` 把默认目录 `~/.quosparr` 整体单引号包裹，远端 shell 不再展开 `~`，`cat` exit 1（ErrFileNotFound）。修复：`remotePath` 对纯字符路径裸传、保留 `~`/`~user` 前缀不引用、其余引用；补 tilde+空格 用例。原冒烟用绝对路径目录，未覆盖默认目录场景——已记为教训。
+- 两台实机验收：开发机 10.10.10.20（数据源，开启状态导出）→ MacBook 10.10.10.22（远程模式）：widget 快照实时镜像远端数据（claude Max 5x 2 行、codex pro、grok notLoggedIn 如实镜像），GUI launchd 上下文探针验证 BatchMode 认证与拉取 OK；剥离 quarantine 避免 App Translocation。

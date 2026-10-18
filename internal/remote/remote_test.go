@@ -86,17 +86,17 @@ func TestArgsAssembly(t *testing.T) {
 		{
 			name: "default port and dir",
 			cfg:  Config{Host: "dev"},
-			want: "-o BatchMode=yes -o ConnectTimeout=8 dev cat '~/.quosparr/status.json'",
+			want: "-o BatchMode=yes -o ConnectTimeout=8 dev cat ~/.quosparr/status.json",
 		},
 		{
 			name: "explicit port",
 			cfg:  Config{Host: "dev", Port: 2222},
-			want: "-o BatchMode=yes -o ConnectTimeout=8 -p 2222 dev cat '~/.quosparr/status.json'",
+			want: "-o BatchMode=yes -o ConnectTimeout=8 -p 2222 dev cat ~/.quosparr/status.json",
 		},
 		{
 			name: "user@host verbatim",
 			cfg:  Config{Host: "me@dev.example", Dir: "/srv/data"},
-			want: "-o BatchMode=yes -o ConnectTimeout=8 me@dev.example cat '/srv/data/status.json'",
+			want: "-o BatchMode=yes -o ConnectTimeout=8 me@dev.example cat /srv/data/status.json",
 		},
 		{
 			name: "dir with spaces",
@@ -107,6 +107,11 @@ func TestArgsAssembly(t *testing.T) {
 			name: "dir with single quote",
 			cfg:  Config{Host: "dev", Dir: "/opt/it's"},
 			want: `-o BatchMode=yes -o ConnectTimeout=8 dev cat '/opt/it'\''s/status.json'`,
+		},
+		{
+			name: "tilde dir with spaces stays expandable",
+			cfg:  Config{Host: "dev", Dir: "~/.my dir"},
+			want: `-o BatchMode=yes -o ConnectTimeout=8 dev cat ~/'.my dir/status.json'`,
 		},
 	}
 	for _, tc := range cases {
