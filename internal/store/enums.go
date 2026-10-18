@@ -24,11 +24,19 @@ const (
 	ProviderZai Provider = "zai"
 	// ProviderAgy is the Antigravity CLI usage (read-only agy subprocess).
 	ProviderAgy Provider = "agy"
+	// ProviderDeepSeek is the DeepSeek prepaid balance (managed API key).
+	ProviderDeepSeek Provider = "deepseek"
+	// ProviderMiniMax is the MiniMax Coding plan quota (managed API key).
+	ProviderMiniMax Provider = "minimax"
+	// ProviderPixelLab is the PixelLab credit balance (managed API key).
+	ProviderPixelLab Provider = "pixellab"
+	// ProviderElevenLabs is the ElevenLabs subscription quota (API key).
+	ProviderElevenLabs Provider = "elevenlabs"
 )
 
 // Providers returns every valid Provider, in display order.
 func Providers() []Provider {
-	return []Provider{ProviderCodex, ProviderClaude, ProviderGrok, ProviderCursor, ProviderKimi, ProviderZai, ProviderAgy}
+	return []Provider{ProviderCodex, ProviderClaude, ProviderGrok, ProviderCursor, ProviderKimi, ProviderZai, ProviderDeepSeek, ProviderAgy, ProviderMiniMax, ProviderPixelLab, ProviderElevenLabs}
 }
 
 // Valid reports whether v is a known value.

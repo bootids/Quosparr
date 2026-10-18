@@ -93,6 +93,15 @@ type Usage struct {
 	Features    []UsageFeature
 }
 
+// Balance is one prepaid balance row (deepseek, pixellab). Numeric fields
+// use NaN for "absent" like Limit.
+type Balance struct {
+	Currency string
+	Total    float64
+	Granted  float64
+	ToppedUp float64
+}
+
 // State is the business state of one quota provider. It never holds a
 // credential and is safe to cache and serialize.
 type State struct {
@@ -101,6 +110,8 @@ type State struct {
 	Plan    string
 	Limits  []Limit
 	Usage   *Usage
+	// Balances are prepaid balance rows (deepseek, pixellab); nil otherwise.
+	Balances []Balance
 	// FetchedAt is the completion time of the last successful fetch.
 	FetchedAt time.Time
 }

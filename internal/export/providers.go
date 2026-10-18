@@ -12,5 +12,9 @@ type StatusProviders struct {
 	Kimi       *ProviderSnapshot   `json:"kimi,omitempty"`
 	Zai        *ProviderSnapshot   `json:"zai,omitempty"`
 	Agy        *ProviderSnapshot   `json:"agy,omitempty"`
+	DeepSeek   *ProviderSnapshot   `json:"deepseek,omitempty"`
+	MiniMax    *ProviderSnapshot   `json:"minimax,omitempty"`
+	PixelLab   *ProviderSnapshot   `json:"pixellab,omitempty"`
+	ElevenLabs *ProviderSnapshot   `json:"elevenlabs,omitempty"`
 	ResetToday *ResetTodaySnapshot `json:"resetToday,omitempty"`
 }

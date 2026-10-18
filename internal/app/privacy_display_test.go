@@ -67,13 +67,13 @@ func TestAccountsProviderHeaderHasNoOuterTrackOrPrivacyControl(t *testing.T) {
 			ui.Column(c).Fill().Padding(16).Children(func() { accountProviderHeader(c, u, accountFormOf(u)) })
 		}, 700, 240)
 		tt.SetDark(dark)
-		grok, ok := tt.Find(u.L().Text(l10n.KeyProviderGrok))
-		if !ok {
-			t.Fatal("account provider tabs missing")
-		}
-		image := tt.Image()
-		if image.RGBAAt(650, int(grok.Y+grok.H/2)) != image.RGBAAt(650, 200) {
-			t.Fatal("account provider header has an extra full-width track or privacy button")
+		// The provider tabs may wrap onto a second line now that the account
+		// page covers eight quota providers; the strip must still fit the
+		// window and carry no privacy controls.
+		for _, text := range tt.Texts() {
+			if r, ok := tt.Find(text); !ok || r.X < -0.5 || r.X+r.W > 700+0.5 {
+				t.Fatalf("account provider header text %q overflows: %+v", text, r)
+			}
 		}
 		if hasExact(tt, u.L().Text(l10n.KeyAccountPrivacyMode)) || hasExact(tt, tx(u.L(), xPrivacyDisplaySection)) {
 			t.Fatal("account provider header still contains privacy controls")

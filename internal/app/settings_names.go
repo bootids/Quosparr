@@ -20,8 +20,16 @@ func providerKey(v store.Provider) l10n.Key {
 		return l10n.KeyProviderKimi
 	case store.ProviderZai:
 		return l10n.KeyProviderZai
+	case store.ProviderDeepSeek:
+		return l10n.KeyProviderDeepSeek
 	case store.ProviderAgy:
 		return l10n.KeyProviderAgy
+	case store.ProviderMiniMax:
+		return l10n.KeyProviderMiniMax
+	case store.ProviderPixelLab:
+		return l10n.KeyProviderPixelLab
+	case store.ProviderElevenLabs:
+		return l10n.KeyProviderElevenLabs
 	default:
 		return l10n.KeyProviderCodex
 	}

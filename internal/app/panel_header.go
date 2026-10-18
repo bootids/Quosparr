@@ -72,12 +72,21 @@ func panelBusy(snap runway.Snapshot, grokView bool) bool {
 // monochrome and gray. With no SelectProvider action the tabs stay disabled.
 func providerStrip(c *ui.Context, a *App, l l10n.Localizer, snap runway.Snapshot, providers []store.Provider, cur store.Provider, selectFn func(store.Provider)) {
 	t := c.Theme()
+	// With more tabs than the seven the names were sized for, the strip goes
+	// compact: icons and quota bars only, the name stays on the tooltip and
+	// the section title below.
+	compact := len(providers) > 7
 	ui.Row(c).Gap(6).Padding(10, 0, 0, 0).Children(func() {
 		for _, p := range providers {
 			name := l.Text(providerKey(p))
 			selected := p == cur
-			tab := ui.ButtonBase(c.Key("provider-tab-"+string(p))).Label(name).Disabled(selectFn == nil).
-				Grow(1).Basis(0).Padding(6, 10, 7, 10).Radius(radiusRow).Cursor(ui.CursorPointer)
+			tab := ui.ButtonBase(c.Key("provider-tab-" + string(p))).Label(name).Disabled(selectFn == nil).
+				Grow(1).Basis(0).Radius(radiusRow).Cursor(ui.CursorPointer).Tooltip(name)
+			if compact {
+				tab.Padding(6, 5, 7, 5)
+			} else {
+				tab.Padding(6, 10, 7, 10)
+			}
 			switch {
 			case selected && tab.Hovered():
 				tab.Background(mono(t, 0.10, 0.15))
@@ -91,11 +100,15 @@ func providerStrip(c *ui.Context, a *App, l l10n.Localizer, snap runway.Snapshot
 					ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
 						if selected {
 							ProviderIcon(c, p, 16).TextColor(t.Text)
-							ui.Text(c, name).FontSize(fsCallout).FontWeight(600).SingleLine()
+							if !compact {
+								ui.Text(c, name).FontSize(fsCallout).FontWeight(600).SingleLine()
+							}
 							return
 						}
 						ProviderMonoIcon(c, p, 16).TextColor(inkTertiary(t))
-						ui.Text(c, name).FontSize(fsCallout).TextColor(inkTertiary(t)).SingleLine()
+						if !compact {
+							ui.Text(c, name).FontSize(fsCallout).TextColor(inkTertiary(t)).SingleLine()
+						}
 					})
 					meter, ok := runway.ShortestWindowMeter(providerMeters(snap, p))
 					stripBar(c, meter, ok, selected)
@@ -115,7 +128,7 @@ func providerMeters(snap runway.Snapshot, p store.Provider) []runway.Meter {
 		return snap.Grok.Meters
 	case store.ProviderClaude:
 		return snap.Claude.Meters
-	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy, store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs:
 		return snap.Meters[p].Meters
 	default:
 		return snap.Codex.Meters

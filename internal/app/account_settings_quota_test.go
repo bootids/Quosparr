@@ -21,9 +21,11 @@ func TestSettingsQuotaUsesMainBranchSummaries(t *testing.T) {
 	q := runway.GrokAccountQuota{Plan: "SuperGrok", UsedPercent: 49, ResetsAt: reset, IncludedUSD: "$73.50 / $150.00", UpdatedAt: now}
 	cq := runway.ClaudeAccountQuota{Plan: "Max 20x", Title: l.Text(l10n.KeyFiveHourUsage), UsedPercent: 49, ResetsAt: reset, ExtraUsage: "10 / 1234 USD", UpdatedAt: now}
 	for _, provider := range accountTabProviders() {
-		if provider == store.ProviderZai || provider == store.ProviderCursor || provider == store.ProviderKimi || provider == store.ProviderAgy {
-			// The zai, cursor, kimi and agy tabs store configuration, not
-			// cached per-account quotas.
+		if provider == store.ProviderZai || provider == store.ProviderCursor || provider == store.ProviderKimi || provider == store.ProviderAgy ||
+			provider == store.ProviderDeepSeek || provider == store.ProviderMiniMax || provider == store.ProviderPixelLab || provider == store.ProviderElevenLabs {
+			// The zai, cursor, kimi, agy, deepseek, minimax, pixellab and
+			// elevenlabs tabs store configuration, not cached per-account
+			// quotas.
 			continue
 		}
 		v := accountIdentityView{account: acc, current: true, provider: provider, grokQuota: &q, claudeQuota: &cq}

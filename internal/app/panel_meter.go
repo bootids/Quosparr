@@ -13,12 +13,13 @@ import (
 )
 
 // quotaOnlyProvider reports whether p is one of the quota-only providers
-// (cursor, kimi, zai, agy): they render one quota section and have no local
-// scan modules, so the panel's local-scan logic must not treat them as
-// Grok or Claude.
+// (cursor, kimi, zai, deepseek, agy, minimax, pixellab, elevenlabs): they
+// render one quota section and have no local scan modules, so the panel's
+// local-scan logic must not treat them as Grok or Claude.
 func quotaOnlyProvider(p store.Provider) bool {
 	switch p {
-	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderDeepSeek,
+		store.ProviderAgy, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs:
 		return true
 	}
 	return false
@@ -72,10 +73,10 @@ func panelMeterReady(c *ui.Context, l l10n.Localizer, ms runway.MeterState, prov
 			ui.Text(c, ms.Plan).FontSize(fsCaption).FontWeight(600)
 		}
 		now := time.Now()
-		// Kimi, Z.ai and Antigravity show only headline pools, so every row
-		// is a primary quota row with its reset line; the other quota-only
-		// providers keep Grok's one-primary-plus-slim-rows layout.
-		primaryRows := provider == store.ProviderKimi || provider == store.ProviderZai || provider == store.ProviderAgy
+		// Kimi, Z.ai, Antigravity and MiniMax show only headline pools, so
+		// every row is a primary quota row with its reset line; the other
+		// quota-only providers keep Grok's one-primary-plus-slim-rows layout.
+		primaryRows := provider == store.ProviderKimi || provider == store.ProviderZai || provider == store.ProviderAgy || provider == store.ProviderMiniMax
 		lastGroup := ""
 		for i, m := range ms.Meters {
 			if m.Group != "" && m.Group != lastGroup {

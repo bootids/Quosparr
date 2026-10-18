@@ -219,7 +219,7 @@ type ResetTodayProvider interface {
 }
 
 // MeterAvailability is the state of a quota-only provider (cursor, kimi,
-// zai, agy).
+// zai, deepseek, agy, minimax, pixellab, elevenlabs).
 type MeterAvailability int
 
 // MeterAvailability values.
@@ -234,8 +234,9 @@ const (
 	MeterError
 )
 
-// MeterState is the runway view of one quota-only provider: the meters for
-// the status bar, floating window and panel, plus detail rows for the panel.
+// MeterState is the runway view of one quota-only provider (cursor, kimi,
+// zai, deepseek, agy, minimax, pixellab, elevenlabs): the meters for the
+// status bar, floating window and panel, plus detail rows for the panel.
 // Amount pools carry their value in the meter's ValueText.
 type MeterState struct {
 	Availability MeterAvailability
@@ -292,5 +293,5 @@ type MeterProvider interface {
 
 // MeterProviders are the quota-only providers in display order.
 func MeterProviders() []store.Provider {
-	return []store.Provider{store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy}
+	return []store.Provider{store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderDeepSeek, store.ProviderAgy, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs}
 }

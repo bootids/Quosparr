@@ -8,7 +8,7 @@
 
 <sub><i>名稱取自 <b>Quo</b>ta（額度）+ <b>Sparr</b>ow（麻雀）</i></sub>
 
-一隻停在選單列裡的小麻雀，替你守著 Codex、Claude 與 Grok 的額度，並為 Cursor、Kimi、Z.ai 與 Antigravity 提供額度表。
+一隻停在選單列裡的小麻雀，替你守著 Codex、Claude 與 Grok 的額度，並為 Cursor、Kimi、Z.ai、Antigravity、DeepSeek、MiniMax、PixelLab 與 ElevenLabs 提供額度表。
 
 Quosparr 是適用於 macOS、Windows、Linux 的原生選單列 / 系統匣應用程式，顯示 Codex、Claude Code 與 Grok 訂閱額度、reset credits、API 等價成本與本機工作階段，三個供應商各自獨立管理帳號。
 
@@ -44,7 +44,9 @@ Quosparr 是適用於 macOS、Windows、Linux 的原生選單列 / 系統匣應�
 
 - Cursor：從本機編輯器狀態讀取訂閱用量摘要（唯讀）：方案、整體、按需與團隊額度池的金額，以及帳單重置日期；也可以在 Quosparr 自己的帳號庫中明確儲存存取權杖，優先於本機探索，權杖不會被記錄。
 - Kimi Code：從本機 Kimi CLI 憑證或 KIMI_CODE_API_KEY 讀取 5 小時與每週額度池及各自重置時間與限流視窗；唯讀。也可以把 API Key 儲存到 Quosparr 的帳號庫，優先順序：已儲存的 Key > KIMI_CODE_API_KEY > 本機 CLI 憑證檔案。
-- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的帳號庫中（intl/cn 區域），顯示 5 小時與每週的 token/credit 額度池及各自重置時間與近 7 天模型用量摘要，第一個新增的帳號會自動設為目前帳號；Antigravity：透過本機 `agy` CLI 查看各額度池的剩餘量，可在設定中選填 CLI 執行檔路徑與設定檔目錄覆蓋。四者皆可在面板、狀態列與懸浮窗中選擇；憑證不會離開本機，只會傳送到各供應商自己的端點。四個分頁還提供消耗速率分析（各額度池的消耗速度及耗盡/重置時間預估），由本機用量樣本計算得出，樣本僅含數字與時間戳、不含任何憑證，並同樣鏡像到遠端唯讀檢視。Kimi 與 Z.ai 分頁還提供 Token 速度分析（各模型首字時間與 tokens/s，含呼叫次數），由本機 oh-my-pi 統計唯讀計算，僅讀取數值用量欄、不涉及訊息內容或憑證；Cursor 與 Antigravity 本機無 token 記錄，不顯示該模組。
+- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的帳號庫中（intl/cn 區域），顯示 5 小時與每週的 token/credit 額度池及各自重置時間與近 7 天模型用量摘要，第一個新增的帳號會自動設為目前帳號；Antigravity：透過本機 `agy` CLI 查看各額度池的剩餘量，可在設定中選填 CLI 執行檔路徑與設定檔目錄覆蓋。
+- DeepSeek：明確 API Key 或 `DEEPSEEK_API_KEY`，顯示多幣別預付餘額。MiniMax：明確 API Key（可選中國站/國際站）、`MINIMAX_CODING_API_KEY` / `MINIMAX_API_KEY`，或自動探索本機 `~/.config/minimax/config.json`，顯示各模型 5 小時與每週額度池的剩餘比例及重置時間。PixelLab：明確 API Key、`PIXELLAB_API_KEY` 或本機 token 檔案，顯示美元餘額與訂閱生成額度。ElevenLabs：明確 API Key、`ELEVENLABS_API_KEY` 或本機 api-key 檔案，顯示 characters 用量、語音槽位與編輯次數。
+- 八者皆可在設定的帳號管理中設定，並可在面板、狀態列與懸浮窗中選擇；憑證不會離開本機，只會傳送到各供應商自己的端點。Cursor、Kimi、Z.ai 與 Antigravity 四個分頁還提供消耗速率分析（各額度池的消耗速度及耗盡/重置時間預估），由本機用量樣本計算得出，樣本僅含數字與時間戳、不含任何憑證，並同樣鏡射到遠端唯讀檢視。Kimi 與 Z.ai 分頁還提供 Token 速度分析（各模型首字時間與 tokens/s，含呼叫次數），由本機 oh-my-pi 統計唯讀計算，僅讀取數值用量欄、不涉及訊息內容或憑證；Cursor 與 Antigravity 本機無 token 記錄，不顯示該模組。
 
 **三個供應商通用**
 

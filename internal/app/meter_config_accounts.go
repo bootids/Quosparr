@@ -11,9 +11,13 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/licoy/quosparr/internal/agy"
 	"github.com/licoy/quosparr/internal/cursor"
+	"github.com/licoy/quosparr/internal/deepseek"
+	"github.com/licoy/quosparr/internal/elevenlabs"
 	"github.com/licoy/quosparr/internal/kimi"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/meter"
+	"github.com/licoy/quosparr/internal/minimax"
+	"github.com/licoy/quosparr/internal/pixellab"
 	"github.com/licoy/quosparr/internal/platform"
 	"github.com/licoy/quosparr/internal/store"
 )
@@ -26,6 +30,11 @@ type meterConfigDraft struct {
 	kimiKey       string
 	agyBin        string
 	agyProfileDir string
+	deepseekKey   string
+	minimaxKey    string
+	minimaxRegion string
+	pixellabKey   string
+	elevenlabsKey string
 	err           string
 }
 
@@ -39,6 +48,14 @@ func (d *meterConfigDraft) clearFor(p store.Provider) {
 		d.kimiKey = ""
 	case store.ProviderAgy:
 		d.agyBin, d.agyProfileDir = "", ""
+	case store.ProviderDeepSeek:
+		d.deepseekKey = ""
+	case store.ProviderMiniMax:
+		d.minimaxKey, d.minimaxRegion = "", ""
+	case store.ProviderPixelLab:
+		d.pixellabKey = ""
+	case store.ProviderElevenLabs:
+		d.elevenlabsKey = ""
 	}
 	d.err = ""
 }
@@ -82,6 +99,58 @@ func renderAgyConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) 
 	meterConfigFormFooter(c, u, f, tx(l, xAgyConfigReset), false, func() { u.resetAgyConfig(f, rt) }, func() { u.saveAgyConfig(f, rt) })
 }
 
+// renderDeepseekConfig is the DeepSeek tab: the resolved key (key saved here,
+// then DEEPSEEK_API_KEY; DeepSeek has no credentials file) and the key editor.
+func renderDeepseekConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {
+	l := u.L()
+	dimText(c, tx(l, xDeepseekConfigIntro))
+	meterConfigStatusCard(c, deepseekConfigStatusLines(l, platform.RunwayDir(rt.home)))
+	ui.Field(c, tx(l, xDeepseekKeyLabel), func() {
+		ui.TextInput(c.Key("deepseek-key"), &f.mcfg.deepseekKey).Password().Placeholder(tx(l, xDeepseekKeyPlaceholder)).Disabled(f.busy)
+	})
+	meterConfigFormFooter(c, u, f, l.Text(l10n.KeyAccountsDelete), true, func() { u.clearDeepseekConfig(f, rt) }, func() { u.saveDeepseekConfig(f, rt) })
+}
+
+// renderMinimaxConfig is the MiniMax tab: the resolved key (key saved here,
+// then the MINIMAX env vars, then the MiniMax CLI login), the effective
+// region, and the key editor with its region picker.
+func renderMinimaxConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {
+	l := u.L()
+	dimText(c, tx(l, xMinimaxConfigIntro))
+	meterConfigStatusCard(c, minimaxConfigStatusLines(l, platform.RunwayDir(rt.home), rt.home))
+	ui.Field(c, tx(l, xMinimaxKeyLabel), func() {
+		ui.TextInput(c.Key("minimax-key"), &f.mcfg.minimaxKey).Password().Placeholder(tx(l, xMinimaxKeyPlaceholder)).Disabled(f.busy)
+	})
+	if v, ok := choose(c, "minimax-region", tx(l, xMinimaxRegionLabel), f.mcfg.minimaxRegion, []string{minimax.RegionCN, minimax.RegionIntl}, func(v string) string { return minimaxRegionText(l, v) }, f.busy); ok {
+		f.mcfg.minimaxRegion = v
+	}
+	meterConfigFormFooter(c, u, f, l.Text(l10n.KeyAccountsDelete), true, func() { u.clearMinimaxConfig(f, rt) }, func() { u.saveMinimaxConfig(f, rt) })
+}
+
+// renderPixellabConfig is the PixelLab tab: the resolved key (key saved
+// here, then PIXELLAB_API_KEY, then the PixelLab CLI token) and the editor.
+func renderPixellabConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {
+	l := u.L()
+	dimText(c, tx(l, xPixellabConfigIntro))
+	meterConfigStatusCard(c, pixellabConfigStatusLines(l, platform.RunwayDir(rt.home), rt.home))
+	ui.Field(c, tx(l, xPixellabKeyLabel), func() {
+		ui.TextInput(c.Key("pixellab-key"), &f.mcfg.pixellabKey).Password().Placeholder(tx(l, xPixellabKeyPlaceholder)).Disabled(f.busy)
+	})
+	meterConfigFormFooter(c, u, f, l.Text(l10n.KeyAccountsDelete), true, func() { u.clearPixellabConfig(f, rt) }, func() { u.savePixellabConfig(f, rt) })
+}
+
+// renderElevenlabsConfig is the ElevenLabs tab: the resolved key (key saved
+// here, then ELEVENLABS_API_KEY, then the elevenlabs CLI key) and the editor.
+func renderElevenlabsConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {
+	l := u.L()
+	dimText(c, tx(l, xElevenlabsConfigIntro))
+	meterConfigStatusCard(c, elevenlabsConfigStatusLines(l, platform.RunwayDir(rt.home), rt.home))
+	ui.Field(c, tx(l, xElevenlabsKeyLabel), func() {
+		ui.TextInput(c.Key("elevenlabs-key"), &f.mcfg.elevenlabsKey).Password().Placeholder(tx(l, xElevenlabsKeyPlaceholder)).Disabled(f.busy)
+	})
+	meterConfigFormFooter(c, u, f, l.Text(l10n.KeyAccountsDelete), true, func() { u.clearElevenlabsConfig(f, rt) }, func() { u.saveElevenlabsConfig(f, rt) })
+}
+
 // meterConfigFormFooter closes a single-configuration tab: the validation
 // error, then the clear and save actions.
 func meterConfigFormFooter(c *ui.Context, u *settingsUI, f *accountForm, clearLabel string, saveNeedsDraft bool, onClear, onSave func()) {
@@ -115,9 +184,16 @@ func meterConfigDraftSecret(f *accountForm) string {
 		return f.mcfg.cursorToken
 	case store.ProviderKimi:
 		return f.mcfg.kimiKey
-	default:
-		return ""
+	case store.ProviderDeepSeek:
+		return f.mcfg.deepseekKey
+	case store.ProviderMiniMax:
+		return f.mcfg.minimaxKey
+	case store.ProviderPixelLab:
+		return f.mcfg.pixellabKey
+	case store.ProviderElevenLabs:
+		return f.mcfg.elevenlabsKey
 	}
+	return ""
 }
 
 // meterConfigStatusCard is the current-configuration summary that leads a
@@ -180,6 +256,104 @@ func kimiConfigStatusLines(l l10n.Localizer, root, home string) []string {
 		return []string{tx(l, xMeterConfigNotConfigured)}
 	}
 	return meterConfigIdentityLines(l, tx(l, xKimiConfigSourceFile), "", cred.HasExpiry, cred.ExpiresAt)
+}
+
+// deepseekConfigStatusLines describes the resolved DeepSeek key by its
+// source; DeepSeek has no local credentials file to discover. A key is only
+// ever shown as its fingerprint.
+func deepseekConfigStatusLines(l l10n.Localizer, root string) []string {
+	key, ok, err := deepseek.LoadConfig(root)
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	if ok {
+		return []string{tx(l, xDeepseekConfigSourceConfigured), tx(l, xMeterConfigKeyHint, meter.KeyHint(key))}
+	}
+	if env := deepseek.EnvKey(); env != "" {
+		return []string{tx(l, xDeepseekConfigSourceEnv), tx(l, xMeterConfigKeyHint, meter.KeyHint(env))}
+	}
+	return []string{tx(l, xMeterConfigNotConfigured)}
+}
+
+// minimaxConfigStatusLines describes the resolved MiniMax key by its source,
+// followed by the effective region. A key is only ever shown as its
+// fingerprint.
+func minimaxConfigStatusLines(l l10n.Localizer, root, home string) []string {
+	key, region, ok, err := minimax.LoadConfig(root)
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	var source string
+	if ok {
+		source = tx(l, xMinimaxConfigSourceConfigured)
+	} else if env := minimax.EnvKey(); env != "" {
+		key, source = env, tx(l, xMinimaxConfigSourceEnv)
+	} else {
+		fileKey, fileRegion, fileOK, fileErr := minimax.LoadCredential("", "", minimax.ConfigFilePath(home))
+		if fileErr != nil {
+			return []string{tx(l, xMeterConfigReadFailed)}
+		}
+		if !fileOK {
+			return []string{tx(l, xMeterConfigNotConfigured)}
+		}
+		key, region, source = fileKey, fileRegion, tx(l, xMinimaxConfigSourceFile)
+	}
+	return []string{source, tx(l, xMeterConfigKeyHint, meter.KeyHint(key)), tx(l, xMinimaxRegionLabel) + ": " + minimaxRegionText(l, region)}
+}
+
+// minimaxRegionText labels a MiniMax region; an unset region is served by
+// the China endpoint, matching the minimax package's default.
+func minimaxRegionText(l l10n.Localizer, region string) string {
+	if region == minimax.RegionIntl {
+		return tx(l, xMinimaxRegionIntl)
+	}
+	return tx(l, xMinimaxRegionCn)
+}
+
+// pixellabConfigStatusLines describes the resolved PixelLab key by its
+// source; a key is only ever shown as its fingerprint.
+func pixellabConfigStatusLines(l l10n.Localizer, root, home string) []string {
+	key, ok, err := pixellab.LoadConfig(root)
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	if ok {
+		return []string{tx(l, xPixellabConfigSourceConfigured), tx(l, xMeterConfigKeyHint, meter.KeyHint(key))}
+	}
+	if env := pixellab.EnvKey(); env != "" {
+		return []string{tx(l, xPixellabConfigSourceEnv), tx(l, xMeterConfigKeyHint, meter.KeyHint(env))}
+	}
+	key, ok, err = pixellab.LoadCredential("", pixellab.TokenFilePath(home))
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	if !ok {
+		return []string{tx(l, xMeterConfigNotConfigured)}
+	}
+	return []string{tx(l, xPixellabConfigSourceFile), tx(l, xMeterConfigKeyHint, meter.KeyHint(key))}
+}
+
+// elevenlabsConfigStatusLines describes the resolved ElevenLabs key by its
+// source; a key is only ever shown as its fingerprint.
+func elevenlabsConfigStatusLines(l l10n.Localizer, root, home string) []string {
+	key, ok, err := elevenlabs.LoadConfig(root)
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	if ok {
+		return []string{tx(l, xElevenlabsConfigSourceConfigured), tx(l, xMeterConfigKeyHint, meter.KeyHint(key))}
+	}
+	if env := elevenlabs.EnvKey(); env != "" {
+		return []string{tx(l, xElevenlabsConfigSourceEnv), tx(l, xMeterConfigKeyHint, meter.KeyHint(env))}
+	}
+	key, ok, err = elevenlabs.LoadCredential("", elevenlabs.APIKeyFilePath(home))
+	if err != nil {
+		return []string{tx(l, xMeterConfigReadFailed)}
+	}
+	if !ok {
+		return []string{tx(l, xMeterConfigNotConfigured)}
+	}
+	return []string{tx(l, xElevenlabsConfigSourceFile), tx(l, xMeterConfigKeyHint, meter.KeyHint(key))}
 }
 
 // agyConfigStatusLines reports the Antigravity CLI discovery: the binary, the
@@ -280,6 +454,84 @@ func (u *settingsUI) saveKimiConfig(f *accountForm, rt *liveApp) {
 	})
 }
 
+// saveDeepseekConfig trims the draft key and requires one before saving.
+func (u *settingsUI) saveDeepseekConfig(f *accountForm, rt *liveApp) {
+	l := u.L()
+	f.mcfg.err = ""
+	key := strings.TrimSpace(f.mcfg.deepseekKey)
+	if key == "" {
+		f.mcfg.err = tx(l, xDeepseekKeyRequired)
+		return
+	}
+	u.accountAct(f, "", func() string {
+		if err := deepseek.SaveConfig(platform.RunwayDir(rt.home), key); err != nil {
+			return l.Text(l10n.KeyStatusError)
+		}
+		u.post(func() { f.mcfg.clearFor(store.ProviderDeepSeek) })
+		rt.refreshMeter(store.ProviderDeepSeek)
+		return ""
+	})
+}
+
+// saveMinimaxConfig trims the draft key and requires one before saving; the
+// region is the picker's selection, normalized by the minimax package.
+func (u *settingsUI) saveMinimaxConfig(f *accountForm, rt *liveApp) {
+	l := u.L()
+	f.mcfg.err = ""
+	key := strings.TrimSpace(f.mcfg.minimaxKey)
+	if key == "" {
+		f.mcfg.err = tx(l, xMinimaxKeyRequired)
+		return
+	}
+	region := f.mcfg.minimaxRegion
+	u.accountAct(f, "", func() string {
+		if err := minimax.SaveConfig(platform.RunwayDir(rt.home), key, region); err != nil {
+			return l.Text(l10n.KeyStatusError)
+		}
+		u.post(func() { f.mcfg.clearFor(store.ProviderMiniMax) })
+		rt.refreshMeter(store.ProviderMiniMax)
+		return ""
+	})
+}
+
+// savePixellabConfig trims the draft key and requires one before saving.
+func (u *settingsUI) savePixellabConfig(f *accountForm, rt *liveApp) {
+	l := u.L()
+	f.mcfg.err = ""
+	key := strings.TrimSpace(f.mcfg.pixellabKey)
+	if key == "" {
+		f.mcfg.err = tx(l, xPixellabKeyRequired)
+		return
+	}
+	u.accountAct(f, "", func() string {
+		if err := pixellab.SaveConfig(platform.RunwayDir(rt.home), key); err != nil {
+			return l.Text(l10n.KeyStatusError)
+		}
+		u.post(func() { f.mcfg.clearFor(store.ProviderPixelLab) })
+		rt.refreshMeter(store.ProviderPixelLab)
+		return ""
+	})
+}
+
+// saveElevenlabsConfig trims the draft key and requires one before saving.
+func (u *settingsUI) saveElevenlabsConfig(f *accountForm, rt *liveApp) {
+	l := u.L()
+	f.mcfg.err = ""
+	key := strings.TrimSpace(f.mcfg.elevenlabsKey)
+	if key == "" {
+		f.mcfg.err = tx(l, xElevenlabsKeyRequired)
+		return
+	}
+	u.accountAct(f, "", func() string {
+		if err := elevenlabs.SaveConfig(platform.RunwayDir(rt.home), key); err != nil {
+			return l.Text(l10n.KeyStatusError)
+		}
+		u.post(func() { f.mcfg.clearFor(store.ProviderElevenLabs) })
+		rt.refreshMeter(store.ProviderElevenLabs)
+		return ""
+	})
+}
+
 // saveAgyConfig stores the path overrides as entered; empty fields are an
 // explicit reset of that side to auto-discovery.
 func (u *settingsUI) saveAgyConfig(f *accountForm, rt *liveApp) {
@@ -303,6 +555,26 @@ func (u *settingsUI) clearCursorConfig(f *accountForm, rt *liveApp) {
 // clearKimiConfig asks for confirmation, then removes the saved key.
 func (u *settingsUI) clearKimiConfig(f *accountForm, rt *liveApp) {
 	u.removeMeterConfigConfirm(f, rt, store.ProviderKimi)
+}
+
+// clearDeepseekConfig asks for confirmation, then removes the saved key.
+func (u *settingsUI) clearDeepseekConfig(f *accountForm, rt *liveApp) {
+	u.removeMeterConfigConfirm(f, rt, store.ProviderDeepSeek)
+}
+
+// clearMinimaxConfig asks for confirmation, then removes the saved key.
+func (u *settingsUI) clearMinimaxConfig(f *accountForm, rt *liveApp) {
+	u.removeMeterConfigConfirm(f, rt, store.ProviderMiniMax)
+}
+
+// clearPixellabConfig asks for confirmation, then removes the saved key.
+func (u *settingsUI) clearPixellabConfig(f *accountForm, rt *liveApp) {
+	u.removeMeterConfigConfirm(f, rt, store.ProviderPixelLab)
+}
+
+// clearElevenlabsConfig asks for confirmation, then removes the saved key.
+func (u *settingsUI) clearElevenlabsConfig(f *accountForm, rt *liveApp) {
+	u.removeMeterConfigConfirm(f, rt, store.ProviderElevenLabs)
 }
 
 // resetAgyConfig restores the default Antigravity discovery without asking:
@@ -348,6 +620,14 @@ func (rt *liveApp) removeMeterConfig(p store.Provider) error {
 		return kimi.RemoveConfig(root)
 	case store.ProviderAgy:
 		return agy.RemoveConfig(root)
+	case store.ProviderDeepSeek:
+		return deepseek.RemoveConfig(root)
+	case store.ProviderMiniMax:
+		return minimax.RemoveConfig(root)
+	case store.ProviderPixelLab:
+		return pixellab.RemoveConfig(root)
+	case store.ProviderElevenLabs:
+		return elevenlabs.RemoveConfig(root)
 	}
 	return errors.New("meter config: unsupported provider")
 }

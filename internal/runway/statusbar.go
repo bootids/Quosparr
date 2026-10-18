@@ -233,7 +233,8 @@ func statusTextFor(lc l10n.Localizer, in StatusInputs, p store.Provider) string 
 		return GrokStatusText(lc, in.Grok, in.Now)
 	case store.ProviderClaude:
 		return ClaudeStatusText(lc, in.Claude, in.Now)
-	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy,
+		store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs:
 		return MeterStatusText(lc, in.Meters[p], in.Now)
 	default:
 		return in.CodexText
@@ -305,7 +306,8 @@ func SelectedMeters(lc l10n.Localizer, in StatusInputs) []Meter {
 		return []Meter{WithShortTitle(lc, in.Grok.Meters[0])}
 	case store.ProviderClaude:
 		return claudeStatusMeters(lc, in.Claude.Meters)
-	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy,
+		store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs:
 		return meterStatusMeters(lc, metersOf(in, picked[0]))
 	default:
 		return nil
@@ -360,7 +362,8 @@ func metersOf(in StatusInputs, p store.Provider) []Meter {
 		return in.Grok.Meters
 	case store.ProviderClaude:
 		return in.Claude.Meters
-	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy,
+		store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs:
 		// An absent entry is the zero MeterState: no meters, nothing to draw.
 		return in.Meters[p].Meters
 	default:
@@ -393,6 +396,14 @@ func providerStatusKey(p store.Provider) l10n.Key {
 		return l10n.KeyProviderZai
 	case store.ProviderAgy:
 		return l10n.KeyProviderAgy
+	case store.ProviderDeepSeek:
+		return l10n.KeyProviderDeepSeek
+	case store.ProviderMiniMax:
+		return l10n.KeyProviderMiniMax
+	case store.ProviderPixelLab:
+		return l10n.KeyProviderPixelLab
+	case store.ProviderElevenLabs:
+		return l10n.KeyProviderElevenLabs
 	default:
 		return l10n.KeyProviderCodex
 	}

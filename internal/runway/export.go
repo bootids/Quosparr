@@ -171,6 +171,14 @@ func statusExportProviders(snap Snapshot) *export.StatusProviders {
 					p.Zai = &w
 				case store.ProviderAgy:
 					p.Agy = &w
+				case store.ProviderDeepSeek:
+					p.DeepSeek = &w
+				case store.ProviderMiniMax:
+					p.MiniMax = &w
+				case store.ProviderPixelLab:
+					p.PixelLab = &w
+				case store.ProviderElevenLabs:
+					p.ElevenLabs = &w
 				}
 			}
 		}

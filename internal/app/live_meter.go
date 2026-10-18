@@ -13,10 +13,14 @@ import (
 
 	"github.com/licoy/quosparr/internal/agy"
 	"github.com/licoy/quosparr/internal/cursor"
+	"github.com/licoy/quosparr/internal/deepseek"
+	"github.com/licoy/quosparr/internal/elevenlabs"
 	"github.com/licoy/quosparr/internal/kimi"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/meter"
+	"github.com/licoy/quosparr/internal/minimax"
 	"github.com/licoy/quosparr/internal/netx"
+	"github.com/licoy/quosparr/internal/pixellab"
 	"github.com/licoy/quosparr/internal/platform"
 	"github.com/licoy/quosparr/internal/runway"
 	"github.com/licoy/quosparr/internal/speed"
@@ -179,7 +183,35 @@ func meterStateFromRaw(lc l10n.Localizer, raw meter.State, loaded bool, now time
 		Meters:       meterLimitMeters(lc, raw.Limits, now),
 		FetchedAt:    raw.FetchedAt,
 	}
+	if len(raw.Balances) > 0 {
+		st.Detail = append(st.Detail, meterBalanceLines(lc, raw.Balances)...)
+	}
 	return st
+}
+
+// meterBalanceLines renders prepaid balance rows as detail lines: the total
+// with granted and topped-up parts when present. Amounts are data; only the
+// labels are localized.
+func meterBalanceLines(lc l10n.Localizer, balances []meter.Balance) []runway.DetailLine {
+	lines := make([]runway.DetailLine, 0, len(balances))
+	for _, b := range balances {
+		if math.IsNaN(b.Total) {
+			continue
+		}
+		title := lc.Text(l10n.KeyMeterBalance)
+		if b.Currency != "" {
+			title += " (" + b.Currency + ")"
+		}
+		value := meterAmount(b.Total)
+		if !math.IsNaN(b.Granted) {
+			value += " · " + lc.Text(l10n.KeyMeterBalanceGranted) + " " + meterAmount(b.Granted)
+		}
+		if !math.IsNaN(b.ToppedUp) {
+			value += " · " + lc.Text(l10n.KeyMeterBalanceToppedUp) + " " + meterAmount(b.ToppedUp)
+		}
+		lines = append(lines, runway.DetailLine{Title: title, Value: value})
+	}
+	return lines
 }
 
 // meterLimitMeters turns the normalized quota pools into panel meters.
@@ -319,7 +351,7 @@ func meterHistoryRates(rs []meter.Rate) []runway.MeterRate {
 	return rows
 }
 
-// newMeterModules builds the four quota-only provider modules and their
+// newMeterModules builds the eight quota-only provider modules and their
 // Options.Meters map. Credentials and environment are re-read inside every
 // fetch, so nothing is captured. The concrete modules are returned for the
 // accounts page (configuration changes refresh them); the zai store and
@@ -451,11 +483,78 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 			_, found, err := agyMeterDiscovery(root, home)
 			return err == nil && found
 		})
+	deepseekMod := newMeterModule(lc,
+		func(ctx context.Context) meter.State {
+			key, err := deepseekMeterKey(root)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "deepseek: read configuration failed")
+			}
+			if key == "" {
+				return meter.NotConfigured()
+			}
+			return deepseek.Fetch(ctx, doer(ctx), key, time.Now())
+		},
+		func(context.Context) bool {
+			key, err := deepseekMeterKey(root)
+			return err == nil && key != ""
+		})
+	minimaxMod := newMeterModule(lc,
+		func(ctx context.Context) meter.State {
+			key, region, ok, err := minimaxMeterCredential(root, home)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "minimax: read configuration failed")
+			}
+			if !ok {
+				return meter.NotConfigured()
+			}
+			if region == "" {
+				region = minimax.RegionCN
+			}
+			return minimax.Fetch(ctx, doer(ctx), key, region, time.Now())
+		},
+		func(context.Context) bool {
+			_, _, ok, err := minimaxMeterCredential(root, home)
+			return err == nil && ok
+		})
+	pixellabMod := newMeterModule(lc,
+		func(ctx context.Context) meter.State {
+			key, ok, err := pixellabMeterKey(root, home)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "pixellab: read configuration failed")
+			}
+			if !ok {
+				return meter.NotConfigured()
+			}
+			return pixellab.Fetch(ctx, doer(ctx), key, time.Now())
+		},
+		func(context.Context) bool {
+			_, ok, err := pixellabMeterKey(root, home)
+			return err == nil && ok
+		})
+	elevenlabsMod := newMeterModule(lc,
+		func(ctx context.Context) meter.State {
+			key, ok, err := elevenlabsMeterKey(root, home)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "elevenlabs: read configuration failed")
+			}
+			if !ok {
+				return meter.NotConfigured()
+			}
+			return elevenlabs.Fetch(ctx, doer(ctx), key, time.Now())
+		},
+		func(context.Context) bool {
+			_, ok, err := elevenlabsMeterKey(root, home)
+			return err == nil && ok
+		})
 	mods := map[store.Provider]*meterModule{
-		store.ProviderCursor: cursorMod,
-		store.ProviderKimi:   kimiMod,
-		store.ProviderZai:    zaiMod,
-		store.ProviderAgy:    agyMod,
+		store.ProviderCursor:     cursorMod,
+		store.ProviderKimi:       kimiMod,
+		store.ProviderZai:        zaiMod,
+		store.ProviderDeepSeek:   deepseekMod,
+		store.ProviderAgy:        agyMod,
+		store.ProviderMiniMax:    minimaxMod,
+		store.ProviderPixelLab:   pixellabMod,
+		store.ProviderElevenLabs: elevenlabsMod,
 	}
 	hist := meter.LoadHistory(filepath.Join(root, "meter-history.json"))
 	meters := make(map[store.Provider]runway.MeterProvider, len(mods))
@@ -493,4 +592,54 @@ func agyMeterDiscovery(root, home string) (agy.Discovery, bool, error) {
 	}
 	d, found := agy.Detect("", home)
 	return d, found, nil
+}
+
+// deepseekMeterKey resolves the DeepSeek credential key: the explicitly
+// configured API key wins over DEEPSEEK_API_KEY; DeepSeek has no credentials
+// file to discover. "" when neither is set.
+func deepseekMeterKey(root string) (string, error) {
+	key, ok, err := deepseek.LoadConfig(root)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return key, nil
+	}
+	return deepseek.EnvKey(), nil
+}
+
+// minimaxMeterCredential resolves the MiniMax credential: the explicit
+// configuration wins, then the environment key, then the read-only MiniMax
+// CLI config file. The region may stay "" (the caller defaults it).
+func minimaxMeterCredential(root, home string) (key, region string, ok bool, err error) {
+	key, region, ok, err = minimax.LoadConfig(root)
+	if err != nil || ok {
+		return key, region, ok, err
+	}
+	if k := minimax.EnvKey(); k != "" {
+		return k, "", true, nil
+	}
+	return minimax.LoadCredential("", "", minimax.ConfigFilePath(home))
+}
+
+// pixellabMeterKey resolves the PixelLab credential: the explicitly
+// configured API key wins over PIXELLAB_API_KEY, then the PixelLab CLI token
+// file.
+func pixellabMeterKey(root, home string) (string, bool, error) {
+	key, ok, err := pixellab.LoadConfig(root)
+	if err != nil || ok {
+		return key, ok, err
+	}
+	return pixellab.LoadCredential(pixellab.EnvKey(), pixellab.TokenFilePath(home))
+}
+
+// elevenlabsMeterKey resolves the ElevenLabs credential: the explicitly
+// configured API key wins over ELEVENLABS_API_KEY, then the elevenlabs CLI
+// api-key file.
+func elevenlabsMeterKey(root, home string) (string, bool, error) {
+	key, ok, err := elevenlabs.LoadConfig(root)
+	if err != nil || ok {
+		return key, ok, err
+	}
+	return elevenlabs.LoadCredential(elevenlabs.EnvKey(), elevenlabs.APIKeyFilePath(home))
 }

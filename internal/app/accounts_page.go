@@ -27,6 +27,10 @@ const (
 	accountKindCursor
 	accountKindKimi
 	accountKindAgy
+	accountKindDeepseek
+	accountKindMinimax
+	accountKindPixellab
+	accountKindElevenlabs
 )
 
 // accountsPage is wired from settings_view.go.
@@ -56,6 +60,14 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		renderKimiConfig(c, u, f, rt)
 	case accountKindAgy:
 		renderAgyConfig(c, u, f, rt)
+	case accountKindDeepseek:
+		renderDeepseekConfig(c, u, f, rt)
+	case accountKindMinimax:
+		renderMinimaxConfig(c, u, f, rt)
+	case accountKindPixellab:
+		renderPixellabConfig(c, u, f, rt)
+	case accountKindElevenlabs:
+		renderElevenlabsConfig(c, u, f, rt)
 	default:
 		renderClaudeAccounts(c, u, f, rt)
 	}
@@ -118,6 +130,14 @@ func accountKindProvider(kind int) store.Provider {
 		return store.ProviderKimi
 	case accountKindAgy:
 		return store.ProviderAgy
+	case accountKindDeepseek:
+		return store.ProviderDeepSeek
+	case accountKindMinimax:
+		return store.ProviderMiniMax
+	case accountKindPixellab:
+		return store.ProviderPixelLab
+	case accountKindElevenlabs:
+		return store.ProviderElevenLabs
 	default:
 		return store.ProviderCodex
 	}
@@ -252,7 +272,7 @@ func (u *settingsUI) previewClaudeFile(f *accountForm, rt *liveApp) {
 // Claude and Grok logins, the Z.ai API-key library, and the three
 // single-configuration meters (cursor token, kimi key, agy paths).
 func accountTabProviders() []store.Provider {
-	return []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai, store.ProviderCursor, store.ProviderKimi, store.ProviderAgy}
+	return []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai, store.ProviderCursor, store.ProviderKimi, store.ProviderAgy, store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs}
 }
 
 func accountProviderHeader(c *ui.Context, u *settingsUI, f *accountForm) {

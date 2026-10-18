@@ -6,11 +6,14 @@ import (
 	"math"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/licoy/quosparr/internal/deepseek"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/meter"
+	"github.com/licoy/quosparr/internal/platform"
 	"github.com/licoy/quosparr/internal/runway"
 	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
@@ -156,10 +159,10 @@ func TestMeterStateOmitsUsageDetail(t *testing.T) {
 	}
 }
 
-func TestSelectableProvidersReturnsAllSeven(t *testing.T) {
+func TestSelectableProvidersReturnsAllProviders(t *testing.T) {
 	got := selectableProviders()
 	want := store.Providers()
-	if !slices.Equal(got, want) || len(got) != 7 {
+	if !slices.Equal(got, want) || len(got) != 11 {
 		t.Fatalf("selectableProviders() = %v", got)
 	}
 }
@@ -246,5 +249,54 @@ func TestMeterModuleFiltersStaleHistoryRates(t *testing.T) {
 	}
 	if len(st.Rates) != 2 || !ids["5h"] || !ids["7d"] || ids["limit_month"] {
 		t.Fatalf("rates = %+v", st.Rates)
+	}
+}
+
+func TestMeterModulesNewProvidersNotConfiguredWithoutCredential(t *testing.T) {
+	for _, name := range []string{"DEEPSEEK_API_KEY", "MINIMAX_CODING_API_KEY", "MINIMAX_API_KEY", "PIXELLAB_API_KEY", "ELEVENLABS_API_KEY", "KIMI_SHARE_DIR"} {
+		t.Setenv(name, "")
+	}
+	home := t.TempDir()
+	_, mods, _, _ := newMeterModules(home, store.Preferences{}, nil)
+	for _, p := range []store.Provider{store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs} {
+		mod, ok := mods[p]
+		if !ok {
+			t.Fatalf("meter module of %s missing", p)
+		}
+		if mod.detect(context.Background()) {
+			t.Errorf("detect(%s) = true without any credential", p)
+		}
+		if err := mod.Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if st := mod.State(time.Now()); st.Availability != runway.MeterNotConfigured {
+			t.Fatalf("%s availability = %v, want not-configured; detail %+v", p, st.Availability, st.Detail)
+		}
+	}
+}
+
+func TestMeterModulesDeepSeekConfiguredKeyDetected(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	home := t.TempDir()
+	root := platform.RunwayDir(home)
+	if err := deepseek.SaveConfig(root, "sk-deepseek-test"); err != nil {
+		t.Fatal(err)
+	}
+	_, mods, _, _ := newMeterModules(home, store.Preferences{}, nil)
+	mod := mods[store.ProviderDeepSeek]
+	if mod == nil {
+		t.Fatal("deepseek module missing")
+	}
+	if !mod.detect(context.Background()) {
+		t.Fatal("detect(deepseek) = false with an explicit key")
+	}
+	st := meterStateFromRaw(enLocalizer(), meter.State{
+		Status:    meter.StatusOK,
+		Balances:  []meter.Balance{{Currency: "CNY", Total: 110, Granted: 10, ToppedUp: 100}},
+		FetchedAt: time.Now(),
+	}, true, time.Now())
+	if st.Availability != runway.MeterReady || len(st.Detail) != 1 ||
+		!strings.Contains(st.Detail[0].Title, "CNY") || !strings.HasPrefix(st.Detail[0].Value, "110") {
+		t.Fatalf("deepseek balance state = %+v", st)
 	}
 }

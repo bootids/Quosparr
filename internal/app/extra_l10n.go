@@ -14,150 +14,180 @@ import (
 type textKey string
 
 const (
-	xAccountCount                    textKey = "accountCount"
-	xAccountCountOne                 textKey = "accountCountOne"
-	xPrivacyDisplaySection           textKey = "privacyDisplaySection"
-	xPrivacyDisplayDescription       textKey = "privacyDisplayDescription"
-	xProvider                        textKey = "provider"
-	xProviderDescription             textKey = "providerDescription"
-	xPanelHeight                     textKey = "panelHeight"
-	xPanelLoading                    textKey = "panelLoading"
-	xPanelHeightHint                 textKey = "panelHeightDescription"
-	xMacOnly                         textKey = "settingMacOnly"
-	xWidgetMac14                     textKey = "settingWidgetMac14"
-	xSettingsUnreadable              textKey = "settingsUnreadableTitle"
-	xSettingsReadOnly                textKey = "settingsReadOnlyNote"
-	xProxyBlocked                    textKey = "proxyBlockedNote"
-	xSettingsSaveFailed              textKey = "settingsSaveFailed"
-	xAccountsComingSoon              textKey = "accountsComingSoon"
-	xTrayUnavailable                 textKey = "trayUnavailable"
-	xLinuxDesktopDependencies        textKey = "linuxDesktopDependencies"
-	xLinuxReleaseUnreadable          textKey = "linuxReleaseUnreadable"
-	xPanelPlaceholder                textKey = "panelPlaceholder"
-	xNotAvailableYet                 textKey = "notAvailableYet"
-	xProxyLocalSaveWarning           textKey = "proxyPasswordNotStored"
-	xThemeColor                      textKey = "themeColor"
-	xColorBrown                      textKey = "themeColorBrown"
-	xColorBlue                       textKey = "themeColorBlue"
-	xColorPurple                     textKey = "themeColorPurple"
-	xColorPink                       textKey = "themeColorPink"
-	xColorRed                        textKey = "themeColorRed"
-	xColorOrange                     textKey = "themeColorOrange"
-	xColorYellow                     textKey = "themeColorYellow"
-	xColorGreen                      textKey = "themeColorGreen"
-	xColorGraphite                   textKey = "themeColorGraphite"
-	xColorCustom                     textKey = "themeColorCustom"
-	xFloatingSection                 textKey = "floatingWindowSection"
-	xFloatingEnabled                 textKey = "floatingWindow"
-	xFloatingEnabledHint             textKey = "floatingWindowDescription"
-	xFloatingStyle                   textKey = "floatingWindowStyle"
-	xFloatingStyleCapsule            textKey = "floatingWindowStyleCapsule"
-	xFloatingStyleCard               textKey = "floatingWindowStyleCard"
-	xFloatingStyleRings              textKey = "floatingWindowStyleRings"
-	xFloatingStyleBattery            textKey = "floatingWindowStyleBattery"
-	xFloatingProviders               textKey = "floatingWindowProviders"
-	xFloatingOpacity                 textKey = "floatingWindowOpacity"
-	xFloatingLocked                  textKey = "floatingWindowLocked"
-	xFloatingLockedHint              textKey = "floatingWindowLockedDescription"
-	xFloatingFullScreen              textKey = "floatingWindowOverFullScreen"
-	xFloatingFullScreenHint          textKey = "floatingWindowOverFullScreenDescription"
-	xFloatingHide                    textKey = "floatingWindowHide"
-	xFloatingWayland                 textKey = "floatingWindowWayland"
-	xFloatingAppFilter               textKey = "floatingWindowAppFilter"
-	xFloatingAppFilterHint           textKey = "floatingWindowAppFilterDescription"
-	xFloatingAppFilterOff            textKey = "floatingWindowAppFilterOff"
-	xFloatingAppFilterAllow          textKey = "floatingWindowAppFilterAllow"
-	xFloatingAppFilterBlock          textKey = "floatingWindowAppFilterBlock"
-	xFloatingAppFilterAllowHint      textKey = "floatingWindowAppFilterAllowDescription"
-	xFloatingAppFilterBlockHint      textKey = "floatingWindowAppFilterBlockDescription"
-	xFloatingAppFilterUnsupported    textKey = "floatingWindowAppFilterUnsupported"
-	xFloatingApps                    textKey = "floatingWindowApps"
-	xFloatingAppsNone                textKey = "floatingWindowAppsNone"
-	xFloatingAppsCount               textKey = "floatingWindowAppsCount"
-	xFloatingChooseApps              textKey = "floatingWindowChooseApps"
-	xFloatingAppsTitle               textKey = "floatingWindowAppsTitle"
-	xFloatingAppsSearch              textKey = "floatingWindowAppsSearch"
-	xFloatingAppsAddFile             textKey = "floatingWindowAppsAddFile"
-	xFloatingAppsEmpty               textKey = "floatingWindowAppsEmpty"
-	xFloatingAppsLoadFailed          textKey = "floatingWindowAppsLoadFailed"
-	xFloatingAppsNotApp              textKey = "floatingWindowAppsNotApp"
-	xDisplayFont                     textKey = "displayFont"
-	xDisplayFontHint                 textKey = "displayFontDescription"
-	xDisplayFontDefault              textKey = "displayFontDefault"
-	xPanelProviders                  textKey = "mainPanelProviders"
-	xPanelProvidersHint              textKey = "mainPanelProvidersDescription"
-	xPanelProvidersAll               textKey = "mainPanelProvidersAll"
-	xResetTimeFormat                 textKey = "quotaResetTimeFormat"
-	xResetTimeFormatHint             textKey = "quotaResetTimeFormatDescription"
-	xShowCreditsBalance              textKey = "showCreditsBalance"
-	xShowCreditsBalanceHint          textKey = "showCreditsBalanceDescription"
-	xResetTimeRelative               textKey = "quotaResetTimeRelative"
-	xResetTimeExact                  textKey = "quotaResetTimeExact"
-	xProxyTestURL                    textKey = "networkProxyTestURL"
-	xProxyTestURLInvalid             textKey = "networkProxyTestURLInvalid"
-	xSpeedTitle                      textKey = "speedAnalysis"
-	xSpeedModuleDescription          textKey = "speedAnalysisDescription"
-	xSpeedInfoTTFT                   textKey = "speedAnalysisInfoTTFT"
-	xSpeedInfoNoTTFT                 textKey = "speedAnalysisInfoNoTTFT"
-	xSpeedInfoOutput                 textKey = "speedAnalysisInfoOutput"
-	xSpeedInfoSource                 textKey = "speedAnalysisInfoSource"
-	xSpeedTTFT                       textKey = "speedAnalysisTTFT"
-	xSpeedOutput                     textKey = "speedAnalysisOutput"
-	xSpeedModel                      textKey = "speedAnalysisModel"
-	xSpeedCalls                      textKey = "speedAnalysisCalls"
-	xSpeedByModel                    textKey = "speedAnalysisByModel"
-	xSpeedBasis                      textKey = "speedAnalysisBasis"
-	xSpeedBasisOne                   textKey = "speedAnalysisBasisOne"
-	xSpeedLatest                     textKey = "speedAnalysisLatest"
-	xSpeedEmpty                      textKey = "speedAnalysisEmpty"
-	xSpeedRange                      textKey = "speedAnalysisRange"
-	xSpeedTierFast                   textKey = "speedAnalysisTierFast"
-	xSpeedTierStandard               textKey = "speedAnalysisTierStandard"
-	xSpeedInfoTier                   textKey = "speedAnalysisInfoTier"
-	xLegacyRunningTitle              textKey = "legacyRunningTitle"
-	xLegacyRunningDetail             textKey = "legacyRunningDetail"
-	xLegacyRunningManual             textKey = "legacyRunningManual"
-	xLegacyQuitAndContinue           textKey = "legacyQuitAndContinue"
-	xLegacyQuitFailed                textKey = "legacyQuitFailed"
-	xMeterConfigSave                 textKey = "meterConfigSave"
-	xMeterConfigNotConfigured        textKey = "meterConfigNotConfigured"
-	xMeterConfigReadFailed           textKey = "meterConfigReadFailed"
-	xMeterConfigUser                 textKey = "meterConfigUser"
-	xMeterConfigKeyHint              textKey = "meterConfigKeyHint"
-	xMeterConfigRemoveConfirmTitle   textKey = "meterConfigRemoveConfirmTitle"
-	xMeterConfigRemoveConfirmMessage textKey = "meterConfigRemoveConfirmMessage"
-	xCursorConfigIntro               textKey = "cursorConfigIntro"
-	xCursorConfigSourceConfigured    textKey = "cursorConfigSourceConfigured"
-	xCursorConfigSourceDiscovered    textKey = "cursorConfigSourceDiscovered"
-	xCursorConfigInvalid             textKey = "cursorConfigInvalid"
-	xCursorTokenLabel                textKey = "cursorConfigTokenLabel"
-	xCursorTokenPlaceholder          textKey = "cursorConfigTokenPlaceholder"
-	xCursorTokenRequired             textKey = "cursorConfigTokenRequired"
-	xCursorTokenInvalid              textKey = "cursorConfigTokenInvalid"
-	xKimiConfigIntro                 textKey = "kimiConfigIntro"
-	xKimiConfigSourceConfigured      textKey = "kimiConfigSourceConfigured"
-	xKimiConfigSourceEnv             textKey = "kimiConfigSourceEnv"
-	xKimiConfigSourceFile            textKey = "kimiConfigSourceFile"
-	xKimiKeyLabel                    textKey = "kimiConfigKeyLabel"
-	xKimiKeyPlaceholder              textKey = "kimiConfigKeyPlaceholder"
-	xKimiKeyRequired                 textKey = "kimiConfigKeyRequired"
-	xAgyConfigIntro                  textKey = "agyConfigIntro"
-	xAgyConfigBinLabel               textKey = "agyConfigBinLabel"
-	xAgyConfigBinPlaceholder         textKey = "agyConfigBinPlaceholder"
-	xAgyConfigProfileLabel           textKey = "agyConfigProfileLabel"
-	xAgyConfigProfilePlaceholder     textKey = "agyConfigProfilePlaceholder"
-	xAgyConfigBinFound               textKey = "agyConfigBinFound"
-	xAgyConfigBinMissing             textKey = "agyConfigBinMissing"
-	xAgyConfigProfilePresent         textKey = "agyConfigProfilePresent"
-	xAgyConfigProfileMissing         textKey = "agyConfigProfileMissing"
-	xAgyConfigOverrides              textKey = "agyConfigOverrides"
-	xAgyConfigReset                  textKey = "agyConfigReset"
-	xMeterRateAnalysis               textKey = "meterRateAnalysis"
-	xMeterRateEmpty                  textKey = "meterRateEmpty"
-	xMeterRateExhausts               textKey = "meterRateExhausts"
-	xMeterRateAtReset                textKey = "meterRateAtReset"
-	xMeterSpeedSource                textKey = "meterSpeedSource"
-	xMeterQuotaAvailable             textKey = "meterQuotaAvailable"
+	xAccountCount                     textKey = "accountCount"
+	xAccountCountOne                  textKey = "accountCountOne"
+	xPrivacyDisplaySection            textKey = "privacyDisplaySection"
+	xPrivacyDisplayDescription        textKey = "privacyDisplayDescription"
+	xProvider                         textKey = "provider"
+	xProviderDescription              textKey = "providerDescription"
+	xPanelHeight                      textKey = "panelHeight"
+	xPanelLoading                     textKey = "panelLoading"
+	xPanelHeightHint                  textKey = "panelHeightDescription"
+	xMacOnly                          textKey = "settingMacOnly"
+	xWidgetMac14                      textKey = "settingWidgetMac14"
+	xSettingsUnreadable               textKey = "settingsUnreadableTitle"
+	xSettingsReadOnly                 textKey = "settingsReadOnlyNote"
+	xProxyBlocked                     textKey = "proxyBlockedNote"
+	xSettingsSaveFailed               textKey = "settingsSaveFailed"
+	xAccountsComingSoon               textKey = "accountsComingSoon"
+	xTrayUnavailable                  textKey = "trayUnavailable"
+	xLinuxDesktopDependencies         textKey = "linuxDesktopDependencies"
+	xLinuxReleaseUnreadable           textKey = "linuxReleaseUnreadable"
+	xPanelPlaceholder                 textKey = "panelPlaceholder"
+	xNotAvailableYet                  textKey = "notAvailableYet"
+	xProxyLocalSaveWarning            textKey = "proxyPasswordNotStored"
+	xThemeColor                       textKey = "themeColor"
+	xColorBrown                       textKey = "themeColorBrown"
+	xColorBlue                        textKey = "themeColorBlue"
+	xColorPurple                      textKey = "themeColorPurple"
+	xColorPink                        textKey = "themeColorPink"
+	xColorRed                         textKey = "themeColorRed"
+	xColorOrange                      textKey = "themeColorOrange"
+	xColorYellow                      textKey = "themeColorYellow"
+	xColorGreen                       textKey = "themeColorGreen"
+	xColorGraphite                    textKey = "themeColorGraphite"
+	xColorCustom                      textKey = "themeColorCustom"
+	xFloatingSection                  textKey = "floatingWindowSection"
+	xFloatingEnabled                  textKey = "floatingWindow"
+	xFloatingEnabledHint              textKey = "floatingWindowDescription"
+	xFloatingStyle                    textKey = "floatingWindowStyle"
+	xFloatingStyleCapsule             textKey = "floatingWindowStyleCapsule"
+	xFloatingStyleCard                textKey = "floatingWindowStyleCard"
+	xFloatingStyleRings               textKey = "floatingWindowStyleRings"
+	xFloatingStyleBattery             textKey = "floatingWindowStyleBattery"
+	xFloatingProviders                textKey = "floatingWindowProviders"
+	xFloatingOpacity                  textKey = "floatingWindowOpacity"
+	xFloatingLocked                   textKey = "floatingWindowLocked"
+	xFloatingLockedHint               textKey = "floatingWindowLockedDescription"
+	xFloatingFullScreen               textKey = "floatingWindowOverFullScreen"
+	xFloatingFullScreenHint           textKey = "floatingWindowOverFullScreenDescription"
+	xFloatingHide                     textKey = "floatingWindowHide"
+	xFloatingWayland                  textKey = "floatingWindowWayland"
+	xFloatingAppFilter                textKey = "floatingWindowAppFilter"
+	xFloatingAppFilterHint            textKey = "floatingWindowAppFilterDescription"
+	xFloatingAppFilterOff             textKey = "floatingWindowAppFilterOff"
+	xFloatingAppFilterAllow           textKey = "floatingWindowAppFilterAllow"
+	xFloatingAppFilterBlock           textKey = "floatingWindowAppFilterBlock"
+	xFloatingAppFilterAllowHint       textKey = "floatingWindowAppFilterAllowDescription"
+	xFloatingAppFilterBlockHint       textKey = "floatingWindowAppFilterBlockDescription"
+	xFloatingAppFilterUnsupported     textKey = "floatingWindowAppFilterUnsupported"
+	xFloatingApps                     textKey = "floatingWindowApps"
+	xFloatingAppsNone                 textKey = "floatingWindowAppsNone"
+	xFloatingAppsCount                textKey = "floatingWindowAppsCount"
+	xFloatingChooseApps               textKey = "floatingWindowChooseApps"
+	xFloatingAppsTitle                textKey = "floatingWindowAppsTitle"
+	xFloatingAppsSearch               textKey = "floatingWindowAppsSearch"
+	xFloatingAppsAddFile              textKey = "floatingWindowAppsAddFile"
+	xFloatingAppsEmpty                textKey = "floatingWindowAppsEmpty"
+	xFloatingAppsLoadFailed           textKey = "floatingWindowAppsLoadFailed"
+	xFloatingAppsNotApp               textKey = "floatingWindowAppsNotApp"
+	xDisplayFont                      textKey = "displayFont"
+	xDisplayFontHint                  textKey = "displayFontDescription"
+	xDisplayFontDefault               textKey = "displayFontDefault"
+	xPanelProviders                   textKey = "mainPanelProviders"
+	xPanelProvidersHint               textKey = "mainPanelProvidersDescription"
+	xPanelProvidersAll                textKey = "mainPanelProvidersAll"
+	xResetTimeFormat                  textKey = "quotaResetTimeFormat"
+	xResetTimeFormatHint              textKey = "quotaResetTimeFormatDescription"
+	xShowCreditsBalance               textKey = "showCreditsBalance"
+	xShowCreditsBalanceHint           textKey = "showCreditsBalanceDescription"
+	xResetTimeRelative                textKey = "quotaResetTimeRelative"
+	xResetTimeExact                   textKey = "quotaResetTimeExact"
+	xProxyTestURL                     textKey = "networkProxyTestURL"
+	xProxyTestURLInvalid              textKey = "networkProxyTestURLInvalid"
+	xSpeedTitle                       textKey = "speedAnalysis"
+	xSpeedModuleDescription           textKey = "speedAnalysisDescription"
+	xSpeedInfoTTFT                    textKey = "speedAnalysisInfoTTFT"
+	xSpeedInfoNoTTFT                  textKey = "speedAnalysisInfoNoTTFT"
+	xSpeedInfoOutput                  textKey = "speedAnalysisInfoOutput"
+	xSpeedInfoSource                  textKey = "speedAnalysisInfoSource"
+	xSpeedTTFT                        textKey = "speedAnalysisTTFT"
+	xSpeedOutput                      textKey = "speedAnalysisOutput"
+	xSpeedModel                       textKey = "speedAnalysisModel"
+	xSpeedCalls                       textKey = "speedAnalysisCalls"
+	xSpeedByModel                     textKey = "speedAnalysisByModel"
+	xSpeedBasis                       textKey = "speedAnalysisBasis"
+	xSpeedBasisOne                    textKey = "speedAnalysisBasisOne"
+	xSpeedLatest                      textKey = "speedAnalysisLatest"
+	xSpeedEmpty                       textKey = "speedAnalysisEmpty"
+	xSpeedRange                       textKey = "speedAnalysisRange"
+	xSpeedTierFast                    textKey = "speedAnalysisTierFast"
+	xSpeedTierStandard                textKey = "speedAnalysisTierStandard"
+	xSpeedInfoTier                    textKey = "speedAnalysisInfoTier"
+	xLegacyRunningTitle               textKey = "legacyRunningTitle"
+	xLegacyRunningDetail              textKey = "legacyRunningDetail"
+	xLegacyRunningManual              textKey = "legacyRunningManual"
+	xLegacyQuitAndContinue            textKey = "legacyQuitAndContinue"
+	xLegacyQuitFailed                 textKey = "legacyQuitFailed"
+	xMeterConfigSave                  textKey = "meterConfigSave"
+	xMeterConfigNotConfigured         textKey = "meterConfigNotConfigured"
+	xMeterConfigReadFailed            textKey = "meterConfigReadFailed"
+	xMeterConfigUser                  textKey = "meterConfigUser"
+	xMeterConfigKeyHint               textKey = "meterConfigKeyHint"
+	xMeterConfigRemoveConfirmTitle    textKey = "meterConfigRemoveConfirmTitle"
+	xMeterConfigRemoveConfirmMessage  textKey = "meterConfigRemoveConfirmMessage"
+	xCursorConfigIntro                textKey = "cursorConfigIntro"
+	xCursorConfigSourceConfigured     textKey = "cursorConfigSourceConfigured"
+	xCursorConfigSourceDiscovered     textKey = "cursorConfigSourceDiscovered"
+	xCursorConfigInvalid              textKey = "cursorConfigInvalid"
+	xCursorTokenLabel                 textKey = "cursorConfigTokenLabel"
+	xCursorTokenPlaceholder           textKey = "cursorConfigTokenPlaceholder"
+	xCursorTokenRequired              textKey = "cursorConfigTokenRequired"
+	xCursorTokenInvalid               textKey = "cursorConfigTokenInvalid"
+	xKimiConfigIntro                  textKey = "kimiConfigIntro"
+	xKimiConfigSourceConfigured       textKey = "kimiConfigSourceConfigured"
+	xKimiConfigSourceEnv              textKey = "kimiConfigSourceEnv"
+	xKimiConfigSourceFile             textKey = "kimiConfigSourceFile"
+	xKimiKeyLabel                     textKey = "kimiConfigKeyLabel"
+	xKimiKeyPlaceholder               textKey = "kimiConfigKeyPlaceholder"
+	xKimiKeyRequired                  textKey = "kimiConfigKeyRequired"
+	xAgyConfigIntro                   textKey = "agyConfigIntro"
+	xAgyConfigBinLabel                textKey = "agyConfigBinLabel"
+	xAgyConfigBinPlaceholder          textKey = "agyConfigBinPlaceholder"
+	xAgyConfigProfileLabel            textKey = "agyConfigProfileLabel"
+	xAgyConfigProfilePlaceholder      textKey = "agyConfigProfilePlaceholder"
+	xAgyConfigBinFound                textKey = "agyConfigBinFound"
+	xAgyConfigBinMissing              textKey = "agyConfigBinMissing"
+	xAgyConfigProfilePresent          textKey = "agyConfigProfilePresent"
+	xAgyConfigProfileMissing          textKey = "agyConfigProfileMissing"
+	xAgyConfigOverrides               textKey = "agyConfigOverrides"
+	xAgyConfigReset                   textKey = "agyConfigReset"
+	xDeepseekConfigIntro              textKey = "deepseekConfigIntro"
+	xDeepseekConfigSourceConfigured   textKey = "deepseekConfigSourceConfigured"
+	xDeepseekConfigSourceEnv          textKey = "deepseekConfigSourceEnv"
+	xDeepseekKeyLabel                 textKey = "deepseekConfigKeyLabel"
+	xDeepseekKeyPlaceholder           textKey = "deepseekConfigKeyPlaceholder"
+	xDeepseekKeyRequired              textKey = "deepseekConfigKeyRequired"
+	xMinimaxConfigIntro               textKey = "minimaxConfigIntro"
+	xMinimaxConfigSourceConfigured    textKey = "minimaxConfigSourceConfigured"
+	xMinimaxConfigSourceEnv           textKey = "minimaxConfigSourceEnv"
+	xMinimaxConfigSourceFile          textKey = "minimaxConfigSourceFile"
+	xMinimaxKeyLabel                  textKey = "minimaxConfigKeyLabel"
+	xMinimaxKeyPlaceholder            textKey = "minimaxConfigKeyPlaceholder"
+	xMinimaxKeyRequired               textKey = "minimaxConfigKeyRequired"
+	xMinimaxRegionLabel               textKey = "minimaxRegionLabel"
+	xMinimaxRegionCn                  textKey = "minimaxRegionCn"
+	xMinimaxRegionIntl                textKey = "minimaxRegionIntl"
+	xPixellabConfigIntro              textKey = "pixellabConfigIntro"
+	xPixellabConfigSourceConfigured   textKey = "pixellabConfigSourceConfigured"
+	xPixellabConfigSourceEnv          textKey = "pixellabConfigSourceEnv"
+	xPixellabConfigSourceFile         textKey = "pixellabConfigSourceFile"
+	xPixellabKeyLabel                 textKey = "pixellabConfigKeyLabel"
+	xPixellabKeyPlaceholder           textKey = "pixellabConfigKeyPlaceholder"
+	xPixellabKeyRequired              textKey = "pixellabConfigKeyRequired"
+	xElevenlabsConfigIntro            textKey = "elevenlabsConfigIntro"
+	xElevenlabsConfigSourceConfigured textKey = "elevenlabsConfigSourceConfigured"
+	xElevenlabsConfigSourceEnv        textKey = "elevenlabsConfigSourceEnv"
+	xElevenlabsConfigSourceFile       textKey = "elevenlabsConfigSourceFile"
+	xElevenlabsKeyLabel               textKey = "elevenlabsConfigKeyLabel"
+	xElevenlabsKeyPlaceholder         textKey = "elevenlabsConfigKeyPlaceholder"
+	xElevenlabsKeyRequired            textKey = "elevenlabsConfigKeyRequired"
+	xMeterRateAnalysis                textKey = "meterRateAnalysis"
+	xMeterRateEmpty                   textKey = "meterRateEmpty"
+	xMeterRateExhausts                textKey = "meterRateExhausts"
+	xMeterRateAtReset                 textKey = "meterRateAtReset"
+	xMeterSpeedSource                 textKey = "meterSpeedSource"
+	xMeterQuotaAvailable              textKey = "meterQuotaAvailable"
 )
 
 // extraTexts is indexed by textKey, then by position in l10n.Languages():
@@ -785,6 +815,149 @@ var extraTexts = map[textKey][7]string{
 	xAgyConfigReset: {
 		"Restore defaults", "恢复默认", "恢復預設", "기본값 복원", "デフォルトに戻す", "Восстановить по умолчанию",
 		"Rétablir les valeurs par défaut",
+	},
+	xDeepseekConfigIntro: {
+		"Quosparr uses the DeepSeek API key saved here first, then DEEPSEEK_API_KEY. The key is only stored in Quosparr's own account store and never shown or written to DeepSeek's own files.",
+		"Quosparr 先使用此处保存的 DeepSeek API 密钥，其次使用 DEEPSEEK_API_KEY 环境变量。密钥仅保存在 Quosparr 自有的账号库中，不会显示，也不会写入 DeepSeek 官方文件。",
+		"Quosparr 先使用此處儲存的 DeepSeek API 金鑰，其次使用 DEEPSEEK_API_KEY 環境變數。金鑰僅儲存在 Quosparr 自有的帳號庫中，不會顯示，也不會寫入 DeepSeek 官方檔案。",
+		"Quosparr는 여기에 저장된 DeepSeek API 키를 먼저, 그다음 DEEPSEEK_API_KEY 환경 변수를 사용합니다. 키는 Quosparr 자체 계정 저장소에만 저장되며 표시되거나 DeepSeek 공식 파일에 기록되지 않습니다.",
+		"Quosparrはここに保存したDeepSeek APIキーを優先し、次にDEEPSEEK_API_KEYを使用します。キーはQuosparr独自のアカウントストアにのみ保存され、表示もDeepSeek公式ファイルへの書き込みもされません。",
+		"Quosparr использует сначала API-ключ DeepSeek, сохранённый здесь, затем DEEPSEEK_API_KEY. Ключ хранится только в собственном хранилище аккаунтов Quosparr: он нигде не показывается и не записывается в файлы DeepSeek.",
+		"Quosparr utilise d’abord la clé API DeepSeek enregistrée ici, puis DEEPSEEK_API_KEY. La clé n’est stockée que dans le magasin de comptes de Quosparr : elle n’est jamais affichée ni écrite dans les fichiers officiels de DeepSeek.",
+	},
+	xDeepseekConfigSourceConfigured: {
+		"API key saved in Quosparr", "已保存于 Quosparr 的 API 密钥", "已儲存於 Quosparr 的 API 金鑰",
+		"Quosparr에 저장된 API 키", "Quosparrに保存されたAPIキー", "API-ключ, сохранённый в Quosparr",
+		"Clé API enregistrée dans Quosparr",
+	},
+	xDeepseekConfigSourceEnv: {
+		"Environment variable DEEPSEEK_API_KEY", "环境变量 DEEPSEEK_API_KEY", "環境變數 DEEPSEEK_API_KEY",
+		"환경 변수 DEEPSEEK_API_KEY", "環境変数 DEEPSEEK_API_KEY", "Переменная окружения DEEPSEEK_API_KEY",
+		"Variable d’environnement DEEPSEEK_API_KEY",
+	},
+	xDeepseekKeyLabel: {
+		"API key", "API 密钥", "API 金鑰", "API 키", "APIキー", "API-ключ", "Clé API",
+	},
+	xDeepseekKeyPlaceholder: {
+		"Paste the DeepSeek API key", "粘贴 DeepSeek API 密钥", "貼上 DeepSeek API 金鑰", "DeepSeek API 키를 붙여넣으세요",
+		"DeepSeekのAPIキーを貼り付け", "Вставьте API-ключ DeepSeek", "Collez la clé API DeepSeek",
+	},
+	xDeepseekKeyRequired: {
+		"An API key is required", "需要填写 API 密钥", "需要填寫 API 金鑰", "API 키가 필요합니다",
+		"APIキーが必要です", "Требуется API-ключ", "Une clé API est requise",
+	},
+	xMinimaxConfigIntro: {
+		"Quosparr uses the MiniMax API key saved here first, then MINIMAX_CODING_API_KEY (or MINIMAX_API_KEY), then the login stored by the MiniMax CLI. The key is only stored in Quosparr's own account store and never shown or written to MiniMax's own files.",
+		"Quosparr 依次使用此处保存的 MiniMax API 密钥、MINIMAX_CODING_API_KEY（或 MINIMAX_API_KEY）环境变量以及 MiniMax CLI 本地的登录信息。密钥仅保存在 Quosparr 自有的账号库中，不会显示，也不会写入 MiniMax 官方文件。",
+		"Quosparr 依次使用此處儲存的 MiniMax API 金鑰、MINIMAX_CODING_API_KEY（或 MINIMAX_API_KEY）環境變數以及 MiniMax CLI 本機的登入資訊。金鑰僅儲存在 Quosparr 自有的帳號庫中，不會顯示，也不會寫入 MiniMax 官方檔案。",
+		"Quosparr는 여기에 저장된 MiniMax API 키, MINIMAX_CODING_API_KEY(또는 MINIMAX_API_KEY) 환경 변수, MiniMax CLI의 로컬 로그인 순으로 사용합니다. 키는 Quosparr 자체 계정 저장소에만 저장되며 표시되거나 MiniMax 공식 파일에 기록되지 않습니다.",
+		"Quosparrはここに保存したMiniMax APIキー、次にMINIMAX_CODING_API_KEY（またはMINIMAX_API_KEY）、次にMiniMax CLIのローカルログインを使用します。キーはQuosparr独自のアカウントストアにのみ保存され、表示もMiniMax公式ファイルへの書き込みもされません。",
+		"Quosparr использует сначала API-ключ MiniMax, сохранённый здесь, затем MINIMAX_CODING_API_KEY (или MINIMAX_API_KEY), затем локальный вход MiniMax CLI. Ключ хранится только в собственном хранилище аккаунтов Quosparr: он нигде не показывается и не записывается в файлы MiniMax.",
+		"Quosparr utilise d’abord la clé API MiniMax enregistrée ici, puis MINIMAX_CODING_API_KEY (ou MINIMAX_API_KEY), puis la connexion locale du CLI MiniMax. La clé n’est stockée que dans le magasin de comptes de Quosparr : elle n’est jamais affichée ni écrite dans les fichiers officiels de MiniMax.",
+	},
+	xMinimaxConfigSourceConfigured: {
+		"API key saved in Quosparr", "已保存于 Quosparr 的 API 密钥", "已儲存於 Quosparr 的 API 金鑰",
+		"Quosparr에 저장된 API 키", "Quosparrに保存されたAPIキー", "API-ключ, сохранённый в Quosparr",
+		"Clé API enregistrée dans Quosparr",
+	},
+	xMinimaxConfigSourceEnv: {
+		"Environment variable MINIMAX_CODING_API_KEY", "环境变量 MINIMAX_CODING_API_KEY", "環境變數 MINIMAX_CODING_API_KEY",
+		"환경 변수 MINIMAX_CODING_API_KEY", "環境変数 MINIMAX_CODING_API_KEY", "Переменная окружения MINIMAX_CODING_API_KEY",
+		"Variable d’environnement MINIMAX_CODING_API_KEY",
+	},
+	xMinimaxConfigSourceFile: {
+		"Login from the MiniMax CLI", "来自 MiniMax CLI 的登录", "來自 MiniMax CLI 的登入", "MiniMax CLI의 로그인",
+		"MiniMax CLIのログイン", "Вход из MiniMax CLI", "Connexion du CLI MiniMax",
+	},
+	xMinimaxKeyLabel: {
+		"API key", "API 密钥", "API 金鑰", "API 키", "APIキー", "API-ключ", "Clé API",
+	},
+	xMinimaxKeyPlaceholder: {
+		"Paste the MiniMax API key", "粘贴 MiniMax API 密钥", "貼上 MiniMax API 金鑰", "MiniMax API 키를 붙여넣으세요",
+		"MiniMaxのAPIキーを貼り付け", "Вставьте API-ключ MiniMax", "Collez la clé API MiniMax",
+	},
+	xMinimaxKeyRequired: {
+		"An API key is required", "需要填写 API 密钥", "需要填寫 API 金鑰", "API 키가 필요합니다",
+		"APIキーが必要です", "Требуется API-ключ", "Une clé API est requise",
+	},
+	xMinimaxRegionLabel: {
+		"Region", "区域", "地區", "지역", "リージョン", "Регион", "Région",
+	},
+	xMinimaxRegionCn: {
+		"China (api.minimaxi.com)", "中国站 (api.minimaxi.com)", "中國站 (api.minimaxi.com)", "중국 (api.minimaxi.com)",
+		"中国 (api.minimaxi.com)", "Китай (api.minimaxi.com)", "Chine (api.minimaxi.com)",
+	},
+	xMinimaxRegionIntl: {
+		"International (api.minimax.io)", "国际站 (api.minimax.io)", "國際站 (api.minimax.io)", "국제 (api.minimax.io)",
+		"国際 (api.minimax.io)", "Международный (api.minimax.io)", "International (api.minimax.io)",
+	},
+	xPixellabConfigIntro: {
+		"Quosparr uses the PixelLab API key saved here first, then PIXELLAB_API_KEY, then the token stored by the PixelLab CLI. The key is only stored in Quosparr's own account store and never shown or written to PixelLab's own files.",
+		"Quosparr 依次使用此处保存的 PixelLab API 密钥、PIXELLAB_API_KEY 环境变量以及 PixelLab CLI 本地保存的令牌。密钥仅保存在 Quosparr 自有的账号库中，不会显示，也不会写入 PixelLab 官方文件。",
+		"Quosparr 依次使用此處儲存的 PixelLab API 金鑰、PIXELLAB_API_KEY 環境變數以及 PixelLab CLI 本機儲存的權杖。金鑰僅儲存在 Quosparr 自有的帳號庫中，不會顯示，也不會寫入 PixelLab 官方檔案。",
+		"Quosparr는 여기에 저장된 PixelLab API 키, PIXELLAB_API_KEY 환경 변수, PixelLab CLI의 로컬 토큰 순으로 사용합니다. 키는 Quosparr 자체 계정 저장소에만 저장되며 표시되거나 PixelLab 공식 파일에 기록되지 않습니다.",
+		"Quosparrはここに保存したPixelLab APIキー、次にPIXELLAB_API_KEY、次にPixelLab CLIのローカルトークンを使用します。キーはQuosparr独自のアカウントストアにのみ保存され、表示もPixelLab公式ファイルへの書き込みもされません。",
+		"Quosparr использует сначала API-ключ PixelLab, сохранённый здесь, затем PIXELLAB_API_KEY, затем локальный токен PixelLab CLI. Ключ хранится только в собственном хранилище аккаунтов Quosparr: он нигде не показывается и не записывается в файлы PixelLab.",
+		"Quosparr utilise d’abord la clé API PixelLab enregistrée ici, puis PIXELLAB_API_KEY, puis le jeton local du CLI PixelLab. La clé n’est stockée que dans le magasin de comptes de Quosparr : elle n’est jamais affichée ni écrite dans les fichiers officiels de PixelLab.",
+	},
+	xPixellabConfigSourceConfigured: {
+		"API key saved in Quosparr", "已保存于 Quosparr 的 API 密钥", "已儲存於 Quosparr 的 API 金鑰",
+		"Quosparr에 저장된 API 키", "Quosparrに保存されたAPIキー", "API-ключ, сохранённый в Quosparr",
+		"Clé API enregistrée dans Quosparr",
+	},
+	xPixellabConfigSourceEnv: {
+		"Environment variable PIXELLAB_API_KEY", "环境变量 PIXELLAB_API_KEY", "環境變數 PIXELLAB_API_KEY",
+		"환경 변수 PIXELLAB_API_KEY", "環境変数 PIXELLAB_API_KEY", "Переменная окружения PIXELLAB_API_KEY",
+		"Variable d’environnement PIXELLAB_API_KEY",
+	},
+	xPixellabConfigSourceFile: {
+		"Token from the PixelLab CLI", "来自 PixelLab CLI 的令牌", "來自 PixelLab CLI 的權杖", "PixelLab CLI의 토큰",
+		"PixelLab CLIのトークン", "Токен из PixelLab CLI", "Jeton du CLI PixelLab",
+	},
+	xPixellabKeyLabel: {
+		"API key", "API 密钥", "API 金鑰", "API 키", "APIキー", "API-ключ", "Clé API",
+	},
+	xPixellabKeyPlaceholder: {
+		"Paste the PixelLab API key", "粘贴 PixelLab API 密钥", "貼上 PixelLab API 金鑰", "PixelLab API 키를 붙여넣으세요",
+		"PixelLabのAPIキーを貼り付け", "Вставьте API-ключ PixelLab", "Collez la clé API PixelLab",
+	},
+	xPixellabKeyRequired: {
+		"An API key is required", "需要填写 API 密钥", "需要填寫 API 金鑰", "API 키가 필요합니다",
+		"APIキーが必要です", "Требуется API-ключ", "Une clé API est requise",
+	},
+	xElevenlabsConfigIntro: {
+		"Quosparr uses the ElevenLabs API key saved here first, then ELEVENLABS_API_KEY, then the key stored by the elevenlabs CLI. The key is only stored in Quosparr's own account store and never shown or written to ElevenLabs' own files.",
+		"Quosparr 依次使用此处保存的 ElevenLabs API 密钥、ELEVENLABS_API_KEY 环境变量以及 elevenlabs CLI 本地保存的密钥。密钥仅保存在 Quosparr 自有的账号库中，不会显示，也不会写入 ElevenLabs 官方文件。",
+		"Quosparr 依次使用此處儲存的 ElevenLabs API 金鑰、ELEVENLABS_API_KEY 環境變數以及 elevenlabs CLI 本機儲存的金鑰。金鑰僅儲存在 Quosparr 自有的帳號庫中，不會顯示，也不會寫入 ElevenLabs 官方檔案。",
+		"Quosparr는 여기에 저장된 ElevenLabs API 키, ELEVENLABS_API_KEY 환경 변수, elevenlabs CLI의 로컬 키 순으로 사용합니다. 키는 Quosparr 자체 계정 저장소에만 저장되며 표시되거나 ElevenLabs 공식 파일에 기록되지 않습니다.",
+		"Quosparrはここに保存したElevenLabs APIキー、次にELEVENLABS_API_KEY、次にelevenlabs CLIのローカルキーを使用します。キーはQuosparr独自のアカウントストアにのみ保存され、表示もElevenLabs公式ファイルへの書き込みもされません。",
+		"Quosparr использует сначала API-ключ ElevenLabs, сохранённый здесь, затем ELEVENLABS_API_KEY, затем локальный ключ elevenlabs CLI. Ключ хранится только в собственном хранилище аккаунтов Quosparr: он нигде не показывается и не записывается в файлы ElevenLabs.",
+		"Quosparr utilise d’abord la clé API ElevenLabs enregistrée ici, puis ELEVENLABS_API_KEY, puis la clé locale du CLI elevenlabs. La clé n’est stockée que dans le magasin de comptes de Quosparr : elle n’est jamais affichée ni écrite dans les fichiers officiels d’ElevenLabs.",
+	},
+	xElevenlabsConfigSourceConfigured: {
+		"API key saved in Quosparr", "已保存于 Quosparr 的 API 密钥", "已儲存於 Quosparr 的 API 金鑰",
+		"Quosparr에 저장된 API 키", "Quosparrに保存されたAPIキー", "API-ключ, сохранённый в Quosparr",
+		"Clé API enregistrée dans Quosparr",
+	},
+	xElevenlabsConfigSourceEnv: {
+		"Environment variable ELEVENLABS_API_KEY", "环境变量 ELEVENLABS_API_KEY", "環境變數 ELEVENLABS_API_KEY",
+		"환경 변수 ELEVENLABS_API_KEY", "環境変数 ELEVENLABS_API_KEY", "Переменная окружения ELEVENLABS_API_KEY",
+		"Variable d’environnement ELEVENLABS_API_KEY",
+	},
+	xElevenlabsConfigSourceFile: {
+		"API key from the elevenlabs CLI", "来自 elevenlabs CLI 的密钥", "來自 elevenlabs CLI 的金鑰", "elevenlabs CLI의 키",
+		"elevenlabs CLIのキー", "Ключ из elevenlabs CLI", "Clé du CLI elevenlabs",
+	},
+	xElevenlabsKeyLabel: {
+		"API key", "API 密钥", "API 金鑰", "API 키", "APIキー", "API-ключ", "Clé API",
+	},
+	xElevenlabsKeyPlaceholder: {
+		"Paste the ElevenLabs API key", "粘贴 ElevenLabs API 密钥", "貼上 ElevenLabs API 金鑰", "ElevenLabs API 키를 붙여넣으세요",
+		"ElevenLabsのAPIキーを貼り付け", "Вставьте API-ключ ElevenLabs", "Collez la clé API ElevenLabs",
+	},
+	xElevenlabsKeyRequired: {
+		"An API key is required", "需要填写 API 密钥", "需要填寫 API 金鑰", "API 키가 필요합니다",
+		"APIキーが必要です", "Требуется API-ключ", "Une clé API est requise",
 	},
 
 	xMeterRateAnalysis: {

@@ -75,7 +75,7 @@ func providerTabsOf(c *ui.Context, providers []store.Provider, selected *int, di
 	}
 	l := l10n.New(l10n.English)
 	seg := ui.SegmentedBase(c, selected, len(labels))
-	seg.Track.Padding(3).Gap(2).Radius(7).Background(t.Text.Alpha(0.06)).Children(func() {
+	seg.Track.Padding(3).Gap(2).Radius(7).Wrap().Shrink(1).Background(t.Text.Alpha(0.06)).Children(func() {
 		for i, label := range labels {
 			name := label
 			if name == "" && i < len(providers) {

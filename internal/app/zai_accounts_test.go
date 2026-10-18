@@ -152,7 +152,7 @@ func TestZaiEditorRender(t *testing.T) {
 }
 
 func TestZaiTabProviders(t *testing.T) {
-	if got := accountTabProviders(); !slices.Equal(got, []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai, store.ProviderCursor, store.ProviderKimi, store.ProviderAgy}) {
+	if got := accountTabProviders(); !slices.Equal(got, []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai, store.ProviderCursor, store.ProviderKimi, store.ProviderAgy, store.ProviderDeepSeek, store.ProviderMiniMax, store.ProviderPixelLab, store.ProviderElevenLabs}) {
 		t.Fatalf("accountTabProviders() = %v", got)
 	}
 }
