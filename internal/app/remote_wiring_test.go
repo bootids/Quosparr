@@ -189,8 +189,31 @@ func TestRemoteModeGatesLocalActions(t *testing.T) {
 	if panel.Refresh == nil {
 		t.Error("manual refresh missing in remote mode")
 	}
+	if panel.SelectProvider == nil {
+		t.Error("provider switch missing in remote mode")
+	} else {
+		panel.SelectProvider(store.ProviderClaude) // nil settings must stay safe
+	}
 	if panel.SwitchAccount != nil {
 		t.Error("remote mode installed account switching")
+	}
+}
+
+func TestRemoteModeHidesLocalOnlyPanelModules(t *testing.T) {
+	prefs := store.DefaultPreferences()
+	prefs.ShowsSessionRepairSummary = true
+	prefs.ShowsSkills = true
+	prefs.ShowsQuotaSummary = true
+	prefs.ShowsRecentSessions = true
+	if !panelModuleOn(store.ModuleSessionRepair, prefs, false) || !panelModuleOn(store.ModuleSkills, prefs, false) {
+		t.Fatal("local mode must show both modules")
+	}
+	prefs.RemoteSource = &store.RemoteSource{Enabled: true, Host: "10.10.10.20"}
+	if panelModuleOn(store.ModuleSessionRepair, prefs, false) || panelModuleOn(store.ModuleSkills, prefs, false) {
+		t.Fatal("remote mode must hide session repair and skills")
+	}
+	if !panelModuleOn(store.ModuleQuota, prefs, false) || !panelModuleOn(store.ModuleRecentSessions, prefs, false) {
+		t.Fatal("remote mode must keep the read-only modules")
 	}
 }
 

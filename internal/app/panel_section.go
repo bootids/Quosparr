@@ -39,6 +39,11 @@ func panelBody(c *ui.Context, l l10n.Localizer, prefs store.Preferences, snap ru
 }
 
 func panelModuleOn(m store.Module, p store.Preferences, grok bool) bool {
+	// Remote mode has no local index to repair and no remote skill mirror;
+	// both modules stay hidden instead of disabled.
+	if remoteEnabled(p) && (m == store.ModuleSessionRepair || m == store.ModuleSkills) {
+		return false
+	}
 	if grok && (m == store.ModuleQuotaEstimate || m == store.ModuleSessionRepair || m == store.ModuleRateLimitResetToday) {
 		return false
 	}

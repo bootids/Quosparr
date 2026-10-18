@@ -67,6 +67,7 @@ type ProviderPanelBlock struct {
 	// cached per-account lines (Title is rebuilt locally from Plan/Period).
 	Accounts        []PanelAccount      `json:"accounts,omitempty"`
 	ActiveAccountID string              `json:"activeAccountId,omitempty"`
+	Display         *PanelIdentity      `json:"display,omitempty"`
 	AccountQuotas   []PanelAccountQuota `json:"accountQuotas,omitempty"`
 	// ExtraUsage is Claude's raw extra-usage line.
 	ExtraUsage string `json:"extraUsage,omitempty"`
@@ -80,6 +81,10 @@ type ProviderPanelBlock struct {
 type PanelIdentity struct {
 	Authenticated bool   `json:"authenticated,omitempty"`
 	DisplayName   string `json:"displayName,omitempty"`
+	// Tier is the codex plan tier; it drives the plan badge colors.
+	Tier string `json:"tier,omitempty"`
+	// SubscriptionExpiresAt is the billing period end of the plan.
+	SubscriptionExpiresAt *time.Time `json:"subscriptionExpiresAt,omitempty"`
 }
 
 // PanelAccount mirrors a managed account row for the read-only remote list.

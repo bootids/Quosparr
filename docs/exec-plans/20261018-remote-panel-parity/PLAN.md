@@ -64,6 +64,17 @@ Handoff: out/20261018-remote-panel-parity/HANDOFF.md
 
 - 实机部署发现：本地扫描（成本/图表/会话/速度/推算）原本只在面板打开时运行（`panelOpen` 门控），开发机重启后面板未开 → status.json 的 panel 块缺 estimate/speed/cost/图表/会话，MacBook 镜像退化为空模块。修复（沿用 `widgetLocal` 先例）：`exportsStatusJSON` 开启时完整刷新对所有供应商做本地扫描——`localScope.export` 驱动 grok/claude `RefreshLocal`、codex `loadRecentSessions`/`loadSpeed`、estimate 与 cost/heatmap 扫描门控（`TestClosedPanelExportStillScansLocalData` 回归）。
 - 重新打包部署两端后（本机数据源 + MacBook 均为新构建）：本机开机即写出全量 panel 块（estimate/speed/credits/318 天全设备 + 9 天本机序列/账号/claude 成本与 6 天序列），MacBook 拉取后 widget 镜像 `generatedAt=2026-10-18T06:14:31Z` 同步携带 codex 318 天、claude 6 天序列与全部配额行；进程驻留。MacBook 远程配置复核：remoteSource → 10.10.10.20 默认目录。
+
+### 用户实测反馈修复（2026-10-18 第三轮，MacBook 实机截图）
+
+1. 会员信息缺失：`PanelIdentity` 增加 `tier`/`subscriptionExpiresAt`，`ProviderPanelBlock` 增加 `display`；导出侧 `panelIdentity` 对邮箱形态的 DisplayName 消毒（回退 Username，仍含 @ 则丢弃，测试 `TestPanelIdentityNeverCarriesEmail`），导入侧恢复 `AccountsView.Display`（Tier 徽标、到期角标、身份名）。
+2. 供应商页签不可点击：远程模式安装 `SelectProvider`（本地偏好，经 applyPreferences→RemoteService.SetPreferences→wake 即时重渲），只同步数据、UI/设置各机自理。
+3. Claude 数据不可见：随 2 解决（页签可切换；claude 块数据此前已镜像）。
+4. Codex 窗口标签错误（周数据被标成 5 小时）：该账号 API Primary 实为周窗口（10080 分钟），`NewStatusQuota` 按位置硬命名 "5-hour"；`statusQuota` 改为按真实时长命名（≥6 天 → Weekly，≤12 小时 → 5-hour，未知时长回退位置名），`TestStatusQuotaNamesWindowsByLength` 回归。
+5. 重置动态显示不可用：`remoteResetToday` 用 `resettoday.NewStateSnapshot` 从 widget 块重建 `Detail`（state yes/no/unknown + LastSuccessfulCheckAt），卡片渲染实际结论而非「不可用」。
+6. 会话修复与 Skills 模块：远程模式 `panelModuleOn` 直接隐藏（不再渲染禁用态）。
+
+验证：build/vet/test 全绿 + race 绿；两端重新部署后本机导出 `primary=Weekly 7%`、display 无邮箱（Bootis/pro200/到期日），MacBook 拉取后 codex 首行配额标题为「每周」。
 - 2026-10-18：M1–M5 完成，链关闭。三切片落地后 orchestrator 集成修复：`codexPanelBlock` 导出/导入重名（导入侧改 `panelCodexBlock`）、S2 泛型 `line()` 方法约束不可编译（改为函数参数 `grokQuotaLine`/`claudeQuotaLine`）、S2 测试 `decimal.MustDecimal`→`MustParse` 与缺失 `apiquota` import、S3 测试 `CachedQuota`→冻结字段 `Quota`、远程成本过滤改 UTC 日字符串半开区间（原 `RangeForWindow+time.Local` 在非 UTC 机上边界漂移）、`SetPreferences` 增加 wake 通道让间隔/语言改动即时生效（原实现要等旧 sleep 到期）、E2E fixture 补 `providers` 块（生产两块同写）且 `asOf` 固定为 2026-10-17 UTC。
 
 ## Validation evidence

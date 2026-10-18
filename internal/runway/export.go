@@ -22,22 +22,49 @@ func exportWindow(w codexapi.RateWindow) export.Window {
 	return export.Window{UsedPercent: w.UsedPercent, ResetsAt: timePtr(w.ResetsAt)}
 }
 
+// statusWindowName labels a window for the status file by its real length;
+// the legacy positional names ("primary is 5-hour") mislabel accounts whose
+// primary window is the weekly one, which the remote view then shows under
+// the wrong label.
+func statusWindowName(w codexapi.RateWindow, fallback string) string {
+	switch {
+	case w.WindowMinutes >= 6*24*60:
+		return "Weekly"
+	case w.WindowMinutes > 0:
+		return "5-hour"
+	default:
+		return fallback
+	}
+}
+
 func statusQuota(q codexapi.QuotaSnapshot) export.StatusQuota {
-	in := export.QuotaInput{
-		Primary: exportWindow(q.Primary), CreditsBalance: q.CreditsBalance, UpdatedAt: q.UpdatedAt,
+	out := export.StatusQuota{
+		Primary: export.StatusWindow{
+			Name:        statusWindowName(q.Primary, "5-hour"),
+			UsedPercent: q.Primary.UsedPercent,
+			ResetsAt:    timePtr(q.Primary.ResetsAt),
+		},
+		AdditionalWindows: []export.StatusWindow{},
+		CreditsBalance:    q.CreditsBalance,
+		UpdatedAt:         q.UpdatedAt,
 	}
 	if q.Plan != "" {
 		p := q.Plan
-		in.Plan = &p
+		out.Plan = &p
 	}
 	if q.Secondary != nil {
-		w := exportWindow(*q.Secondary)
-		in.Secondary = &w
+		out.Secondary = &export.StatusWindow{
+			Name:        statusWindowName(*q.Secondary, "Weekly"),
+			UsedPercent: q.Secondary.UsedPercent,
+			ResetsAt:    timePtr(q.Secondary.ResetsAt),
+		}
 	}
 	for _, a := range q.AdditionalWindows {
-		in.Additional = append(in.Additional, export.NamedWindow{Name: a.Name, Window: exportWindow(a.Window)})
+		out.AdditionalWindows = append(out.AdditionalWindows, export.StatusWindow{
+			Name: a.Name, UsedPercent: a.Window.UsedPercent, ResetsAt: timePtr(a.Window.ResetsAt),
+		})
 	}
-	return export.NewStatusQuota(in)
+	return out
 }
 
 func swiftDecimal(d *decimal.Decimal) *swiftjson.Decimal {

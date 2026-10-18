@@ -16,6 +16,7 @@ import (
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/export/swiftjson"
 	"github.com/licoy/quosparr/internal/l10n"
+	"github.com/licoy/quosparr/internal/resettoday"
 	"github.com/licoy/quosparr/internal/sessions"
 	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
@@ -388,7 +389,7 @@ func BuildRemoteSnapshot(st export.StatusSnapshot, prefs store.Preferences, lc l
 	}
 	snap.Grok = remoteGrokState(providers, grokPB, prefs, lc, now)
 	snap.Claude = remoteClaudeState(providers, claudePB, prefs, lc, now)
-	snap.ResetToday = remoteResetToday(providers, lc)
+	snap.ResetToday = remoteResetToday(providers, lc, now)
 	in := StatusInputs{
 		Prefs: prefs, Provider: prefs.SelectedProvider,
 		CodexText: snap.Codex.StatusText, CodexMeters: snap.Codex.Meters,
@@ -501,6 +502,7 @@ func remoteGrokState(providers *export.StatusProviders, pb *export.ProviderPanel
 	}
 	g.Billing = pb.Billing
 	g.Accounts = remoteProviderAccounts(pb.Accounts, pb.ActiveAccountID)
+	g.Accounts.Display = importPanelIdentity(pb.Display)
 	for _, q := range pb.AccountQuotas {
 		if g.AccountQuotas == nil {
 			g.AccountQuotas = map[string]GrokAccountQuota{}
@@ -542,6 +544,7 @@ func remoteClaudeState(providers *export.StatusProviders, pb *export.ProviderPan
 		c.API = &ClaudeAPIView{BaseURL: pb.API.BaseURL, Quota: pb.API.Quota, ErrorCode: pb.API.ErrorCode}
 	}
 	c.Accounts = remoteProviderAccounts(pb.Accounts, pb.ActiveAccountID)
+	c.Accounts.Display = importPanelIdentity(pb.Display)
 	for _, q := range pb.AccountQuotas {
 		if c.AccountQuotas == nil {
 			c.AccountQuotas = map[string]ClaudeAccountQuota{}
@@ -554,7 +557,7 @@ func remoteClaudeState(providers *export.StatusProviders, pb *export.ProviderPan
 	return c
 }
 
-func remoteResetToday(providers *export.StatusProviders, lc l10n.Localizer) ResetTodayState {
+func remoteResetToday(providers *export.StatusProviders, lc l10n.Localizer, now time.Time) ResetTodayState {
 	if providers == nil || providers.ResetToday == nil {
 		return ResetTodayState{}
 	}
@@ -569,7 +572,37 @@ func remoteResetToday(providers *export.StatusProviders, lc l10n.Localizer) Rese
 		v.Text = lc.Text(l10n.KeyRateLimitResetTodayUnknown)
 	}
 	v.Lines = []DetailLine{{lc.Text(l10n.KeyRateLimitResetTodayVerdict), v.Text}}
+	if snap := remoteResetSnapshot(&r, now); snap != nil {
+		v.Detail = snap
+	}
 	return v
+}
+
+// remoteResetSnapshot rebuilds the card payload from the widget copy so the
+// remote card shows the verdict instead of "unavailable"; the state-only
+// constructor is exactly the compatibility shape for a state-only source.
+func remoteResetSnapshot(r *export.ResetTodaySnapshot, now time.Time) *resettoday.Snapshot {
+	fetched := r.FetchedAt
+	if fetched.IsZero() {
+		fetched = now
+	}
+	s := resettoday.NewStateSnapshot(remoteResetState(r.State), fetched)
+	if r.LastSuccessfulCheckAt != nil {
+		at := *r.LastSuccessfulCheckAt
+		s.LastSuccessfulCheckAt = &at
+	}
+	return s
+}
+
+func remoteResetState(s export.ResetState) resettoday.State {
+	switch s {
+	case export.ResetYes:
+		return resettoday.StateYes
+	case export.ResetNo:
+		return resettoday.StateNo
+	default:
+		return resettoday.StateUnknown
+	}
 }
 
 func grokAvailability(a export.Availability) GrokAvailability {
@@ -739,10 +772,20 @@ func dailyTokensMap(rows []export.DailyTokens) map[string]int64 {
 // block; the email never travels in the file, so it stays empty.
 func remoteAccountsView(b *export.CodexPanelBlock) AccountsView {
 	v := remoteProviderAccounts(b.Accounts, b.ActiveAccountID)
-	if b.Display != nil {
-		v.Display = codex.AccountDisplay{Authenticated: b.Display.Authenticated, DisplayName: b.Display.DisplayName}
-	}
+	v.Display = importPanelIdentity(b.Display)
 	return v
+}
+
+// importPanelIdentity restores the signed-in identity facts the header shows
+// (plan tier badge, billing expiry); the email stays empty.
+func importPanelIdentity(d *export.PanelIdentity) codex.AccountDisplay {
+	if d == nil {
+		return codex.AccountDisplay{}
+	}
+	return codex.AccountDisplay{
+		Authenticated: d.Authenticated, DisplayName: d.DisplayName,
+		Tier: codex.Tier(d.Tier), SubscriptionExpiresAt: d.SubscriptionExpiresAt,
+	}
 }
 
 func remoteProviderAccounts(accounts []export.PanelAccount, activeID string) AccountsView {

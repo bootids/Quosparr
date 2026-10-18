@@ -60,7 +60,7 @@ func panelTestSnapshot() Snapshot {
 				},
 			},
 			ActiveID: "acc-1",
-			Display:  codex.AccountDisplay{Authenticated: true, DisplayName: "Alice", Email: "secret@chatgpt.com"},
+			Display:  codex.AccountDisplay{Authenticated: true, DisplayName: "Alice", Email: "secret@chatgpt.com", Tier: codex.TierPlus, SubscriptionExpiresAt: &resets},
 		},
 		Codex: CodexView{
 			Authenticated: true,
@@ -374,5 +374,27 @@ func TestDisplayNameWithoutEmail(t *testing.T) {
 	only := codex.ManagedAccount{ID: "only", Email: "only@x.y"}
 	if got := only.DisplayNameWithoutEmail(); got != "only" {
 		t.Fatalf("email-only account label = %q", got)
+	}
+}
+
+func TestStatusQuotaNamesWindowsByLength(t *testing.T) {
+	weekly := codexapi.RateWindow{UsedPercent: 93, WindowMinutes: 10_080, ResetsAt: time.Now().Add(48 * time.Hour)}
+	five := codexapi.RateWindow{UsedPercent: 7, WindowMinutes: 300, ResetsAt: time.Now().Add(time.Hour)}
+	q := codexapi.QuotaSnapshot{Plan: "pro", Primary: weekly, Secondary: &five, UpdatedAt: time.Now()}
+	out := statusQuota(q)
+	// The account's primary window is the weekly one; the label must follow
+	// the real length, not the position (the remote view shows the label).
+	if out.Primary.Name != "Weekly" || out.Secondary == nil || out.Secondary.Name != "5-hour" {
+		t.Fatalf("window names = %q / %+v", out.Primary.Name, out.Secondary)
+	}
+}
+
+func TestPanelIdentityNeverCarriesEmail(t *testing.T) {
+	d := panelIdentity(codex.AccountDisplay{Authenticated: true, DisplayName: "bootidsss@gmail.com", Username: "bootidsss"})
+	if d == nil || d.DisplayName != "bootidsss" {
+		t.Fatalf("identity = %+v", d)
+	}
+	if d = panelIdentity(codex.AccountDisplay{DisplayName: "a@b.com"}); d != nil {
+		t.Fatalf("email-only identity = %+v", d)
 	}
 }

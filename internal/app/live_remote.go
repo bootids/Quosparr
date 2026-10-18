@@ -129,11 +129,21 @@ func rebuildRemoteSnapshotDetail(snap runway.Snapshot, raw export.StatusSnapshot
 }
 
 // remotePanelActions is the read-only action set of the remote mode: the
-// manual refresh stays and maps to RemoteService.Refresh; every account,
-// repair and detail writer stays nil, which disables its control.
+// manual refresh and the provider switch stay (both are local preferences;
+// the switch re-renders the remote data under the newly shown provider);
+// every account, repair and detail writer stays nil, which disables its
+// control.
 func (rt *liveApp) remotePanelActions(s *Settings) PanelActions {
 	return PanelActions{
 		Refresh: func() { rt.requestRefresh(s, "") },
+		SelectProvider: func(p store.Provider) {
+			if s != nil {
+				// Persisting the preference runs applyPreferences, which
+				// forwards to RemoteService.SetPreferences and wakes the
+				// poll loop for an immediate re-render.
+				s.SetSelectedProvider(p)
+			}
+		},
 	}
 }
 

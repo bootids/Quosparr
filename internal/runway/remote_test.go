@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/licoy/quosparr/internal/apiquota"
+	"github.com/licoy/quosparr/internal/codex"
 	"github.com/licoy/quosparr/internal/estimate"
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/export/swiftjson"
 	"github.com/licoy/quosparr/internal/l10n"
+	"github.com/licoy/quosparr/internal/resettoday"
 	"github.com/licoy/quosparr/internal/sessions"
 	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/usage/decimal"
@@ -165,6 +167,9 @@ func TestBuildRemoteSnapshotFull(t *testing.T) {
 	}
 	if snap.ResetToday.Text == "" || len(snap.ResetToday.Lines) == 0 {
 		t.Fatalf("reset today text = %q", snap.ResetToday.Text)
+	}
+	if s, ok := snap.ResetToday.Detail.(*resettoday.Snapshot); !ok || s == nil || s.State() != resettoday.StateYes {
+		t.Fatalf("reset today detail = %+v", snap.ResetToday.Detail)
 	}
 	if snap.StatusBar.Text == "" {
 		t.Fatal("status bar text empty")
@@ -680,7 +685,7 @@ func TestRemotePanelEndToEnd(t *testing.T) {
 	if out.Codex.APIBalance == nil || out.Codex.APIBalance.Remaining == nil || *out.Codex.APIBalance.Remaining != 7.5 {
 		t.Fatalf("api balance = %+v", out.Codex.APIBalance)
 	}
-	if len(out.Accounts.Sidebar) < 2 || out.Accounts.ActiveID != "acc-1" || out.Accounts.Display.Email != "" || out.Accounts.Display.DisplayName != "Alice" {
+	if len(out.Accounts.Sidebar) < 2 || out.Accounts.ActiveID != "acc-1" || out.Accounts.Display.Email != "" || out.Accounts.Display.DisplayName != "Alice" || out.Accounts.Display.Tier != codex.TierPlus || out.Accounts.Display.SubscriptionExpiresAt == nil {
 		t.Fatalf("accounts = %+v", out.Accounts)
 	}
 	for _, a := range out.Accounts.Sidebar {

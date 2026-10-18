@@ -1,9 +1,6 @@
 package runway
 
 import (
-	"sort"
-	"time"
-
 	"github.com/licoy/quosparr/internal/codex"
 	"github.com/licoy/quosparr/internal/codexapi"
 	"github.com/licoy/quosparr/internal/estimate"
@@ -11,6 +8,9 @@ import (
 	"github.com/licoy/quosparr/internal/sessions"
 	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/usage"
+	"sort"
+	"strings"
+	"time"
 )
 
 // statusExportPanel is the panel block of status.json: the derived data the
@@ -61,11 +61,8 @@ func codexPanelBlock(snap Snapshot) *export.CodexPanelBlock {
 	b.Speed = panelSpeed(c.Speed)
 	b.Accounts = panelAccounts(snap.Accounts.Sidebar)
 	b.ActiveAccountID = snap.Accounts.ActiveID
-	if snap.Accounts.Display.Authenticated || snap.Accounts.Display.DisplayName != "" {
-		b.Display = &export.PanelIdentity{
-			Authenticated: snap.Accounts.Display.Authenticated,
-			DisplayName:   snap.Accounts.Display.DisplayName,
-		}
+	if d := panelIdentity(snap.Accounts.Display); d != nil {
+		b.Display = d
 	}
 	return b
 }
@@ -78,7 +75,7 @@ func providerPanelBlock[G grokQuota | claudeQuota](accounts AccountsView, cost *
 	credits *codexapi.ResetCreditsSnapshot, quotas map[string]G,
 	line func(G) export.PanelAccountQuota, billing *export.PanelGrokBilling,
 ) *export.ProviderPanelBlock {
-	b := &export.ProviderPanelBlock{Billing: billing}
+	b := &export.ProviderPanelBlock{Billing: billing, Display: panelIdentity(accounts.Display)}
 	if cost != nil {
 		c := exportCost(*cost)
 		b.Cost = &c
@@ -91,6 +88,27 @@ func providerPanelBlock[G grokQuota | claudeQuota](accounts AccountsView, cost *
 	b.ActiveAccountID = accounts.ActiveID
 	b.AccountQuotas = panelAccountQuotas(quotas, line)
 	return b
+}
+
+// panelIdentity mirrors the signed-in identity; the email never travels, so
+// an email-shaped display name falls back to the username.
+func panelIdentity(d codex.AccountDisplay) *export.PanelIdentity {
+	name := d.DisplayName
+	if strings.Contains(name, "@") {
+		name = d.Username
+	}
+	if strings.Contains(name, "@") {
+		name = ""
+	}
+	if !d.Authenticated && name == "" && d.Tier == "" && d.SubscriptionExpiresAt == nil {
+		return nil
+	}
+	return &export.PanelIdentity{
+		Authenticated:         d.Authenticated,
+		DisplayName:           name,
+		Tier:                  string(d.Tier),
+		SubscriptionExpiresAt: d.SubscriptionExpiresAt,
+	}
 }
 
 // grokQuota / claudeQuota alias the two quota line types so the shared block
