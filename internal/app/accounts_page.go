@@ -23,6 +23,7 @@ const (
 	accountKindCodex = iota
 	accountKindClaude
 	accountKindGrok
+	accountKindZai
 )
 
 // accountsPage is wired from settings_view.go.
@@ -44,6 +45,8 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		renderCodexAccounts(c, u, f, rt)
 	case accountKindGrok:
 		renderGrokAccounts(c, u, f, rt)
+	case accountKindZai:
+		renderZaiAccounts(c, u, f, rt)
 	default:
 		renderClaudeAccounts(c, u, f, rt)
 	}
@@ -61,6 +64,10 @@ func renderRemoteAccountsPage(c *ui.Context, u *settingsUI, f *accountForm, rt *
 	})
 	priv := u.s.Prefs().AccountPrivacyModeEnabled
 	var rows []codex.ManagedAccount
+	if f.kind == accountKindZai {
+		// The remote status file carries no zai account list; the note stands alone.
+		return
+	}
 	switch f.kind {
 	case accountKindGrok:
 		rows = snap.Grok.Accounts.Sidebar
@@ -94,6 +101,8 @@ func accountKindProvider(kind int) store.Provider {
 		return store.ProviderGrok
 	case accountKindClaude:
 		return store.ProviderClaude
+	case accountKindZai:
+		return store.ProviderZai
 	default:
 		return store.ProviderCodex
 	}
@@ -224,10 +233,18 @@ func (u *settingsUI) previewClaudeFile(f *accountForm, rt *liveApp) {
 	})
 }
 
+// accountTabProviders are the providers with managed accounts: the Codex,
+// Claude and Grok logins, plus the Z.ai API-key library. cursor, kimi and
+// agy stay read-only and never get an accounts tab.
+func accountTabProviders() []store.Provider {
+	return []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai}
+}
+
 func accountProviderHeader(c *ui.Context, u *settingsUI, f *accountForm) {
 	l := u.L()
+	providers := accountTabProviders()
 	ui.Row(c).Children(func() {
-		if ProviderTabs(c.Key("accounts-provider"), &f.kind, f.busy, providerTabLabels(l)...) {
+		if providerTabsOf(c.Key("accounts-provider"), providers, &f.kind, f.busy, providerLabels(l, providers)...) {
 			f.mode, f.paste = "", ""
 			f.selection, f.api = nil, apiDraft{}
 		}
@@ -255,6 +272,7 @@ type accountForm struct {
 	switchName         string
 	switchRelay        bool
 	api                apiDraft
+	zai                zaiDraft
 }
 
 func accountFormOf(u *settingsUI) *accountForm {
@@ -289,7 +307,7 @@ func (u *settingsUI) accountNotice(f *accountForm, msg string) {
 	if msg == "" || msg == l.Text(l10n.KeyAccountsOAuthCancelled) {
 		return
 	}
-	providers := store.Providers()
+	providers := accountTabProviders()
 	title := l.Text(providerKey(providers[min(max(f.kind, 0), len(providers)-1)]))
 	u.showNotice(title, msg)
 }

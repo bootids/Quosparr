@@ -107,6 +107,12 @@ func (u *settingsUI) fontControl(c *ui.Context, cur string, ro bool) {
 // panelProviderRows choose the providers of the main panel: all of them, or
 // a custom set of at least one. Turning custom on keeps every provider
 // checked, so the panel does not change until one is unchecked.
+
+// selectableProviders are the providers offered by the panel and status bar
+// selection UIs: every provider, including the quota-only ones.
+func selectableProviders() []store.Provider {
+	return store.Providers()
+}
 func (u *settingsUI) panelProviderRows(c *ui.Context, row rowFunc, p store.Preferences, ro bool) {
 	s, l := u.s, u.L()
 	custom := len(p.PanelProviders) > 0
@@ -120,7 +126,7 @@ func (u *settingsUI) panelProviderRows(c *ui.Context, row rowFunc, p store.Prefe
 			}, ro); ok {
 			var next []store.Provider
 			if v {
-				next = store.Providers()
+				next = selectableProviders()
 			}
 			s.SetPanelProviders(next)
 		}
@@ -134,7 +140,7 @@ func (u *settingsUI) panelProviderRows(c *ui.Context, row rowFunc, p store.Prefe
 			selected[item] = true
 		}
 		ui.Row(c).Gap(12).Wrap().Children(func() {
-			for _, prov := range store.Providers() {
+			for _, prov := range selectableProviders() {
 				on := selected[prov]
 				// Dropping the last one is not offered.
 				box := ui.Checkbox(c.Key("panel-prov-"+string(prov)), &on, l.Text(providerKey(prov))).
@@ -144,7 +150,7 @@ func (u *settingsUI) panelProviderRows(c *ui.Context, row rowFunc, p store.Prefe
 				}
 				selected[prov] = on
 				next := make([]store.Provider, 0, len(selected))
-				for _, item := range store.Providers() {
+				for _, item := range selectableProviders() {
 					if selected[item] {
 						next = append(next, item)
 					}
@@ -228,7 +234,7 @@ func statusBarProviderChecks(c *ui.Context, l l10n.Localizer, s *Settings, p sto
 		}
 	}
 	ui.Row(c).Gap(12).Wrap().Children(func() {
-		for _, prov := range store.Providers() {
+		for _, prov := range selectableProviders() {
 			on := selected[prov]
 			// A third pick and dropping the last one are not offered.
 			box := ui.Checkbox(c.Key("sb-prov-"+string(prov)), &on, l.Text(providerKey(prov))).
@@ -237,7 +243,7 @@ func statusBarProviderChecks(c *ui.Context, l l10n.Localizer, s *Settings, p sto
 				continue
 			}
 			next := make([]store.Provider, 0, 2)
-			for _, item := range store.Providers() {
+			for _, item := range selectableProviders() {
 				want := selected[item]
 				if item == prov {
 					want = on

@@ -8,7 +8,7 @@
 
 <sub><i>名称取自 <b>Quo</b>ta（额度）+ <b>Sparr</b>ow（麻雀）</i></sub>
 
-一只停在菜单栏里的小麻雀，替你守着 Codex、Claude 与 Grok 的额度。
+一只停在菜单栏里的小麻雀，替你守着 Codex、Claude 与 Grok 的额度，并为 Cursor、Kimi、Z.ai 与 Antigravity 提供只读额度表。
 
 Quosparr 是面向 macOS、Windows、Linux 的原生菜单栏 / 系统托盘应用，展示 Codex、Claude Code 与 Grok 订阅额度、reset credits、API 等价成本与本机会话，三个供应商各自独立管理账号。
 
@@ -39,6 +39,12 @@ Quosparr 是面向 macOS、Windows、Linux 的原生菜单栏 / 系统托盘应�
 - 通过官方 CLI chat-proxy 计费接口查看包含额度、Build / Imagine / Chat 拆分、周 / 月周期、预付余额和按需用量
 - 多个 OAuth / SuperGrok 账号：隔离登录、导入当前登录、粘贴凭据、刷新、别名、排序与显式切号
 - 查看本地 Grok CLI 日志中的最近会话
+
+**额度表**
+
+- Cursor：从本地编辑器状态读取订阅用量摘要（只读）：套餐、总体、按需与团队额度池的美元金额，以及账单重置日期。
+- Kimi Code：从本地 Kimi CLI 凭据或 KIMI_CODE_API_KEY 读取每周额度池与限流窗口；只读。
+- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的账号库中（intl/cn 区域），显示 token/credit/tool 额度池与近 7 天模型用量摘要；Antigravity：通过本地 `agy` CLI 查看各额度池的剩余量。四者均可在面板、状态栏与悬浮窗中选择；凭据不会离开本机，只会发往各供应商自己的接口。
 
 **三个供应商通用**
 

@@ -180,6 +180,86 @@ func TestPairTextFallsBackToSecondProvider(t *testing.T) {
 	}
 }
 
+func TestMeterProviderSingleSelectionShowsFiveHour(t *testing.T) {
+	five := testMeter("5小时", 20, 300, SourceStandard)
+	weekly := testMeter("每周", 40, 10080, SourceStandard)
+	in := StatusInputs{
+		Prefs:    store.Preferences{StatusBarProviderScope: store.ProviderScopeCustom, StatusBarProviders: []store.Provider{store.ProviderZai}},
+		Provider: store.ProviderCodex,
+		Meters:   map[store.Provider]MeterState{store.ProviderZai: {Availability: MeterReady, Meters: []Meter{five, weekly}}},
+		Now:      time.Now(),
+	}
+	meters := SelectedMeters(zh, in)
+	if len(meters) != 1 || meters[0].WindowMinutes != 300 || meters[0].Title != "5小时" {
+		t.Fatalf("meters = %+v", meters)
+	}
+	if got, want := SelectedStatusText(zh, in), MeterStatusText(zh, in.Meters[store.ProviderZai], in.Now); got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestMeterProviderPairCombinesLabeledMeters(t *testing.T) {
+	five := testMeter("5小时", 20, 300, SourceStandard)
+	weekly := testMeter("每周", 40, 10080, SourceStandard)
+	in := StatusInputs{
+		Prefs:       store.Preferences{StatusBarProviderScope: store.ProviderScopeCustom, StatusBarProviders: []store.Provider{store.ProviderCodex, store.ProviderZai}},
+		Provider:    store.ProviderCodex,
+		CodexText:   "80%",
+		CodexMeters: []Meter{five},
+		Meters:      map[store.Provider]MeterState{store.ProviderZai: {Availability: MeterReady, Meters: []Meter{weekly}}},
+		Now:         time.Now(),
+	}
+	meters := SelectedMeters(zh, in)
+	if len(meters) != 2 ||
+		meters[0].Title != zh.Text(l10n.KeyProviderCodex)+" · 5小时" ||
+		meters[1].Title != zh.Text(l10n.KeyProviderZai)+" · 每周" ||
+		meters[1].WindowMinutes != 10080 {
+		t.Fatalf("meters = %+v", meters)
+	}
+}
+
+func TestMeterProviderNotConfiguredShowsHint(t *testing.T) {
+	in := StatusInputs{
+		Prefs:    store.Preferences{StatusBarProviderScope: store.ProviderScopeCustom, StatusBarProviders: []store.Provider{store.ProviderZai}},
+		Provider: store.ProviderCodex,
+		Meters:   map[store.Provider]MeterState{store.ProviderZai: {Availability: MeterNotConfigured}},
+		Now:      time.Now(),
+	}
+	if got, want := SelectedStatusText(zh, in), zh.Text(l10n.KeyMeterNotConfigured); got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+	if meters := SelectedMeters(zh, in); len(meters) != 0 {
+		t.Fatalf("meters = %+v, want none", meters)
+	}
+}
+
+func TestMeterPairWithoutMetersFallsBackToSecond(t *testing.T) {
+	five := testMeter("5-hour", 20, 300, SourceStandard)
+	in := StatusInputs{
+		Prefs:     store.Preferences{StatusBarProviderScope: store.ProviderScopeCustom, StatusBarProviders: []store.Provider{store.ProviderZai, store.ProviderClaude}},
+		Provider:  store.ProviderCodex,
+		Meters:    map[store.Provider]MeterState{store.ProviderZai: {Availability: MeterNotConfigured}},
+		Claude:    ClaudeState{Availability: ClaudeReady, Meters: []Meter{five}},
+		CodexText: "codex",
+		Now:       time.Now(),
+	}
+	if got, want := SelectedStatusText(zh, in), ClaudeStatusText(zh, in.Claude, in.Now); got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestMeterAmountPoolShowsValueText(t *testing.T) {
+	amount := testMeter("Amount", 0, 0, SourceStandard)
+	amount.ValueText = "$3.20"
+	amount.ResetsAt = time.Time{}
+	if got := percentText(amount); got != "$3.20" {
+		t.Fatalf("percentText = %q", got)
+	}
+	if got := MeterStatusText(zh, MeterState{Availability: MeterReady, Meters: []Meter{amount}}, time.Now()); got != "$3.20" {
+		t.Fatalf("status text = %q", got)
+	}
+}
+
 func TestShortWindowTitlesMatchCodexWording(t *testing.T) {
 	for minutes, want := range map[int]string{300: "5小时", 10080: "每周", 30 * 24 * 60: "每月"} {
 		if got := ShortWindowTitle(zh, minutes); got != want {

@@ -21,6 +21,28 @@ type StatusPanel struct {
 	Codex  *CodexPanelBlock    `json:"codex,omitempty"`
 	Grok   *ProviderPanelBlock `json:"grok,omitempty"`
 	Claude *ProviderPanelBlock `json:"claude,omitempty"`
+	// Meters holds the quota-only providers (cursor, kimi, zai, agy) keyed
+	// by their provider string; absent when none has data.
+	Meters map[string]MeterPanelBlock `json:"meters,omitempty"`
+}
+
+// MeterPanelBlock mirrors a quota-only provider for the remote panel: the
+// availability, the plan, the same quota rows the widget snapshot carries,
+// the detail lines and the last fetch time. Error is the already-redacted
+// user-facing failure text, empty when the last fetch succeeded.
+type MeterPanelBlock struct {
+	Availability string            `json:"availability"`
+	Plan         string            `json:"plan,omitempty"`
+	Meters       []WidgetQuota     `json:"meters,omitempty"`
+	Detail       []PanelDetailLine `json:"detail,omitempty"`
+	FetchedAt    *time.Time        `json:"fetchedAt,omitempty"`
+	Error        string            `json:"error,omitempty"`
+}
+
+// PanelDetailLine is one "title: value" row of a remote panel section.
+type PanelDetailLine struct {
+	Title string `json:"title"`
+	Value string `json:"value"`
 }
 
 // CodexPanelBlock extends the Codex mirror beyond the widget summary.

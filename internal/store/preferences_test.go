@@ -253,7 +253,8 @@ func TestEnumRawValuesMatchSwift(t *testing.T) {
 		got  []string
 		want []string
 	}{
-		"provider":      {conv(Providers()), strs("codex", "claude", "grok")},
+		// cursor/kimi/zai/agy are Go-only providers after the frozen Swift set.
+		"provider":      {conv(Providers()), strs("codex", "claude", "grok", "cursor", "kimi", "zai", "agy")},
 		"language":      {conv(Languages()), strs("system", "english", "simplifiedChinese", "traditionalChinese", "korean", "japanese", "russian", "french")},
 		"appearance":    {conv(Appearances()), strs("system", "light", "dark")},
 		"background":    {conv(PanelBackgrounds()), strs("translucent", "opaque")},

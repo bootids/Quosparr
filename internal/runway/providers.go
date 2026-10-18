@@ -10,6 +10,7 @@ import (
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/sessions"
 	"github.com/licoy/quosparr/internal/speed"
+	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/usage"
 )
 
@@ -215,4 +216,52 @@ type ResetTodayProvider interface {
 	// dedupes them through the alert store.
 	PendingAlerts(now time.Time) []alerts.Alert
 	SetOnChange(fn func())
+}
+
+// MeterAvailability is the state of a quota-only provider (cursor, kimi,
+// zai, agy).
+type MeterAvailability int
+
+// MeterAvailability values.
+const (
+	// MeterNotConfigured means no credential was detected; nothing is shown.
+	MeterNotConfigured MeterAvailability = iota
+	// MeterLoading is the state before the first fetch finished.
+	MeterLoading
+	// MeterReady means at least one reading succeeded.
+	MeterReady
+	// MeterError means the last fetch failed; Detail may explain why.
+	MeterError
+)
+
+// MeterState is the runway view of one quota-only provider: the meters for
+// the status bar, floating window and panel, plus detail rows for the panel.
+// Amount pools carry their value in the meter's ValueText.
+type MeterState struct {
+	Availability MeterAvailability
+	// Plan is the subscription tier name ("" when unknown).
+	Plan   string
+	Meters []Meter
+	Detail []DetailLine
+	// FetchedAt is the last successful fetch (zero when never).
+	FetchedAt time.Time
+}
+
+// MeterProvider is the seam a quota-only provider plugs into. The locking
+// rules of GrokProvider apply: State is quick and never calls back into the
+// Service, and onChange must run without any lock State takes.
+type MeterProvider interface {
+	// State returns the current immutable state as of now.
+	State(now time.Time) MeterState
+	// Refresh refetches the provider's quota over the network.
+	Refresh(ctx context.Context) error
+	// RefreshLocal re-detects local credentials only; it never fetches.
+	RefreshLocal(ctx context.Context) error
+	// SetOnChange registers the callback invoked after State changed.
+	SetOnChange(fn func())
+}
+
+// MeterProviders are the quota-only providers in display order.
+func MeterProviders() []store.Provider {
+	return []store.Provider{store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy}
 }

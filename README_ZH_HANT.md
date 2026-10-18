@@ -8,7 +8,7 @@
 
 <sub><i>名稱取自 <b>Quo</b>ta（額度）+ <b>Sparr</b>ow（麻雀）</i></sub>
 
-一隻停在選單列裡的小麻雀，替你守著 Codex、Claude 與 Grok 的額度。
+一隻停在選單列裡的小麻雀，替你守著 Codex、Claude 與 Grok 的額度，並為 Cursor、Kimi、Z.ai 與 Antigravity 提供唯讀額度表。
 
 Quosparr 是適用於 macOS、Windows、Linux 的原生選單列 / 系統匣應用程式，顯示 Codex、Claude Code 與 Grok 訂閱額度、reset credits、API 等價成本與本機工作階段，三個供應商各自獨立管理帳號。
 
@@ -39,6 +39,12 @@ Quosparr 是適用於 macOS、Windows、Linux 的原生選單列 / 系統匣應�
 - 透過官方 CLI chat-proxy 計費介面，查看包含額度、Build / Imagine / Chat 拆分、週 / 月週期、預付餘額和按需使用量。
 - 多個 OAuth / SuperGrok 帳號：隔離登入、匯入目前登入、貼上憑證、重新整理、別名、排序與明確切換帳號。
 - 查看本機 Grok CLI 日誌中的最近工作階段。
+
+**額度表**
+
+- Cursor：從本機編輯器狀態讀取訂閱用量摘要（唯讀）：方案、整體、按需與團隊額度池的金額，以及帳單重置日期。
+- Kimi Code：從本機 Kimi CLI 憑證或 KIMI_CODE_API_KEY 讀取每週額度池與限流視窗；唯讀。
+- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的帳號庫中（intl/cn 區域），顯示 token/credit/tool 額度池與近 7 天模型用量摘要；Antigravity：透過本機 `agy` CLI 查看各額度池的剩餘量。四者皆可在面板、狀態列與懸浮窗中選擇；憑證不會離開本機，只會傳送到各供應商自己的端點。
 
 **三個供應商通用**
 

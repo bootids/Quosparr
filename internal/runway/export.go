@@ -7,6 +7,7 @@ import (
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/export/swiftjson"
 	"github.com/licoy/quosparr/internal/sessions"
+	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/usage"
 	"github.com/licoy/quosparr/internal/usage/decimal"
 )
@@ -157,6 +158,22 @@ func statusExportProviders(snap Snapshot) *export.StatusProviders {
 	if snap.ResetToday.Widget != nil {
 		r := *snap.ResetToday.Widget
 		p.ResetToday = &r
+	}
+	for _, sp := range MeterProviders() {
+		if ms, ok := snap.Meters[sp]; ok {
+			if w, has := meterWidgetSnapshot(sp, ms, true); has {
+				switch sp {
+				case store.ProviderCursor:
+					p.Cursor = &w
+				case store.ProviderKimi:
+					p.Kimi = &w
+				case store.ProviderZai:
+					p.Zai = &w
+				case store.ProviderAgy:
+					p.Agy = &w
+				}
+			}
+		}
 	}
 	return &p
 }

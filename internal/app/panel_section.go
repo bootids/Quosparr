@@ -83,6 +83,8 @@ func panelModule(c *ui.Context, l l10n.Localizer, m store.Module, prefs store.Pr
 			panelClaudeQuota(c, l, snap, acts, first, state, state.resetSwitch(prefs.QuotaResetTimeFormat), prefs.AccountPrivacyModeEnabled)
 		case grok:
 			panelGrokQuota(c, l, snap, acts, first, state, state.resetSwitch(prefs.QuotaResetTimeFormat))
+		case quotaOnlyProvider(prefs.SelectedProvider):
+			panelMeterQuota(c, l, snap, prefs.SelectedProvider, acts, first, state, state.resetSwitch(prefs.QuotaResetTimeFormat))
 		default:
 			panelCodexQuota(c, l, snap, acts, first, state, state.resetSwitch(prefs.QuotaResetTimeFormat), prefs.AccountPrivacyModeEnabled, prefs.ShowsCreditsBalance)
 		}

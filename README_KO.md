@@ -8,7 +8,7 @@
 
 <sub><i>이름은 <b>Quo</b>ta(할당량) + <b>Sparr</b>ow(참새)에서 왔습니다</i></sub>
 
-메뉴 막대에 앉은 작은 참새가 Codex, Claude, Grok 할당량을 지켜봅니다.
+메뉴 막대에 앉은 작은 참새가 Codex, Claude, Grok 할당량을 지켜보고, Cursor, Kimi, Z.ai, Antigravity의 읽기 전용 할당량 계량기도 보여 줍니다.
 
 Quosparr는 macOS, Windows, Linux용 네이티브 메뉴 막대 / 시스템 트레이 앱입니다. Codex, Claude Code, Grok 구독 할당량, reset credits, API 환산 비용, 로컬 세션을 보여 주며 공급자별로 계정을 따로 관리합니다.
 
@@ -39,6 +39,12 @@ Quosparr는 macOS, Windows, Linux용 네이티브 메뉴 막대 / 시스템 트�
 - 공식 CLI chat-proxy 결제 API로 포함 할당량, Build / Imagine / Chat 분해, 주간 / 월간 주기, 선불 잔액, 온디맨드 사용량을 봅니다.
 - 여러 OAuth / SuperGrok 계정을 격리 로그인, 현재 로그인 가져오기, 자격 증명 붙여넣기, 새로고침, 별칭, 정렬, 명시적 전환으로 관리합니다.
 - 로컬 Grok CLI 로그의 최근 세션.
+
+**할당량 계량기**
+
+- Cursor: 로컬 에디터 상태에서 구독 사용량 요약을 읽습니다(읽기 전용). 플랜, 전체, 온디맨드, 팀 풀의 달러 금액과 결제 리셋 날짜를 보여 줍니다.
+- Kimi Code: 로컬 Kimi CLI 자격 증명 또는 KIMI_CODE_API_KEY에서 주간 풀과 속도 제한 창을 읽습니다. 읽기 전용입니다.
+- Z.ai Coding Plan: API 키는 Quosparr 자체 계정 저장소에만 보관되며(intl/cn 리전), 토큰/크레딧/도구 풀과 최근 7일 모델 사용량 요약을 보여 줍니다. Antigravity: 로컬 `agy` CLI로 각 풀의 남은 사용량을 봅니다. 넷 모두 패널, 상태 표시줄, 플로팅 창에서 선택할 수 있으며, 자격 증명은 해당 공급자 자신의 엔드포인트로만 전송될 뿐 컴퓨터를 벗어나지 않습니다.
 
 **세 공급자 공통**
 

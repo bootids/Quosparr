@@ -1,0 +1,42 @@
+{
+  "code": 200,
+  "msg": "Operation successful",
+  "success": true,
+  "data": {
+    "x_time": [
+      "2026-10-02 14:00",
+      "2026-10-02 15:00",
+      "2026-10-02 16:00",
+      "2026-10-02 17:00"
+    ],
+    "modelCallCount": [0, 0, 0, 1],
+    "tokensUsage": [0, 0, 0, 7949],
+    "totalUsage": {
+      "totalModelCallCount": 6856,
+      "totalTokensUsage": 688408686,
+      "modelSummaryList": [
+        { "modelName": "GLM-5.3", "totalTokens": 826662212, "sortOrder": 1 },
+        { "modelName": "GLM-5.3-Flash", "totalTokens": 58233867, "sortOrder": 2 }
+      ]
+    },
+    "modelDataList": [
+      {
+        "modelName": "GLM-5.3",
+        "sortOrder": 1,
+        "tokensUsage": [0, 0, 0, 7949],
+        "totalTokens": 826662212
+      },
+      {
+        "modelName": "GLM-5.3-Flash",
+        "sortOrder": 2,
+        "tokensUsage": [0, 0, 0, 0],
+        "totalTokens": 58233867
+      }
+    ],
+    "modelSummaryList": [
+      { "modelName": "GLM-5.3", "totalTokens": 826662212, "sortOrder": 1 },
+      { "modelName": "GLM-5.3-Flash", "totalTokens": 58233867, "sortOrder": 2 }
+    ],
+    "granularity": "hourly"
+  }
+}

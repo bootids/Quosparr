@@ -293,6 +293,24 @@ func (s *Service) quotaWantedLocked(p store.Provider) bool {
 	return s.showsProviderLocked(p) || slices.Contains(s.prefs.PanelSelection(), p)
 }
 
+// meterDemandLocked captures each quota-only provider's demand for a full
+// refresh: the quota fetch runs when the provider is demanded (selected, in
+// the status bar or floating selection, or in the panel's provider strip),
+// and the cheap credential re-detection runs on the same cadence the Grok
+// and Claude local refreshes would. Undemanded providers stay untouched.
+func (s *Service) meterDemandLocked(widgetLocal, exportLocal bool) (want, show, local map[store.Provider]bool) {
+	want, show, local = map[store.Provider]bool{}, map[store.Provider]bool{}, map[store.Provider]bool{}
+	for _, p := range MeterProviders() {
+		if s.opts.Meters[p] == nil {
+			continue
+		}
+		want[p] = s.quotaWantedLocked(p)
+		show[p] = s.showsProviderLocked(p)
+		local[p] = widgetLocal || exportLocal || s.panelLocalLocked(p)
+	}
+	return want, show, local
+}
+
 func (s *Service) widgetNeedsLocked() bool {
 	r := s.widgetReqs
 	return r.Has(export.RequireProviderQuota) || r.Has(export.RequireTokenTrend) || r.Has(export.RequireCost)
@@ -328,6 +346,14 @@ func (s *Service) refreshGrokLocal() {
 	g := s.opts.Grok
 	s.spawn(func() {
 		_ = g.RefreshLocal(s.root)
+		s.publish()
+	})
+}
+
+// refreshMeter refreshes a quota-only provider in the background.
+func (s *Service) refreshMeter(m MeterProvider) {
+	s.spawn(func() {
+		_ = m.Refresh(s.root)
 		s.publish()
 	})
 }
@@ -482,6 +508,7 @@ func (s *Service) startFull(policy usage.RefreshPolicy, widgets bool) <-chan str
 		}
 		grokLocal := widgetLocal || exportLocal || s.panelLocalLocked(store.ProviderGrok)
 		claudeLocal := widgetLocal || exportLocal || s.panelLocalLocked(store.ProviderClaude)
+		meterWant, meterShow, meterLocal := s.meterDemandLocked(widgetLocal, exportLocal)
 		s.mu.Unlock()
 		report := func(err error, shown bool) {
 			if err != nil && ctx.Err() == nil && shown {
@@ -505,6 +532,20 @@ func (s *Service) startFull(policy usage.RefreshPolicy, widgets bool) <-chan str
 			}
 			if claudeLocal {
 				report(c.RefreshLocal(ctx), showsClaude)
+			}
+		}
+		for _, p := range MeterProviders() {
+			m := s.opts.Meters[p]
+			if m == nil {
+				continue
+			}
+			if meterWant[p] {
+				report(m.Refresh(ctx), meterShow[p])
+			}
+			// Credential re-detection only; meter providers have no local
+			// scans, so this stays cheap.
+			if meterLocal[p] {
+				report(m.RefreshLocal(ctx), meterShow[p])
 			}
 		}
 		if exportLocal {
@@ -924,6 +965,7 @@ func (s *Service) RefreshQuota() <-chan struct{} {
 	}
 	wantsGrok := s.quotaWantedLocked(store.ProviderGrok)
 	wantsClaude := s.quotaWantedLocked(store.ProviderClaude)
+	meterWant, _, _ := s.meterDemandLocked(false, false)
 	s.mu.Unlock()
 	if busy {
 		return closedChan()
@@ -933,6 +975,11 @@ func (s *Service) RefreshQuota() <-chan struct{} {
 	}
 	if wantsClaude {
 		s.refreshClaude(true)
+	}
+	for _, p := range MeterProviders() {
+		if m := s.opts.Meters[p]; m != nil && meterWant[p] {
+			s.refreshMeter(m)
+		}
 	}
 	return s.runAccountScoped(s.refreshQuotaNow)
 }

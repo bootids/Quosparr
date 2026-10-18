@@ -31,6 +31,7 @@ import (
 	"github.com/licoy/quosparr/internal/sqliteruntime"
 	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/usage"
+	"github.com/licoy/quosparr/internal/zai"
 )
 
 // BackgroundOptions is what StartBackground needs from main.
@@ -175,6 +176,8 @@ type liveApp struct {
 	grok           *grokBridge
 	claudeMod      *claude.Module
 	claudeB        *claudeBridge
+	zaiStore       *zai.Store
+	zaiMod         *meterModule
 	reset          *resetBridge
 	repo           *usage.Repository
 	widgets        *widgetCoordinator
@@ -232,6 +235,7 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		log.Println("claude accounts: load failed")
 	}
 	cbridge.reload(false)
+	meters, zstore, zmod := newMeterModules(home, prefs, langs)
 	reset := newResetBridge(opts.Settings, prefs, langs)
 	repo := openUsage(home)
 	widgetRequirements := initialWidgetRequirements(opts.Settings)
@@ -266,6 +270,7 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		StatusPath:          export.DefaultStatusPath(home),
 		Grok:                bridge,
 		Claude:              cbridge,
+		Meters:              meters,
 		ResetToday:          reset,
 		WidgetRequirements:  widgetRequirements,
 		WidgetSink:          widgets.publish,
@@ -279,7 +284,7 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		SystemLanguages: langs,
 	})
 	rt := &liveApp{
-		svc: svc, localSvc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset,
+		svc: svc, localSvc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset, zaiStore: zstore, zaiMod: zmod,
 		repo: repo, widgets: widgets, dispatch: dispatch, widgetDispatch: widgetUI, alertDispatch: alertUI, version: opts.Version, langs: langs,
 	}
 	widgets.onRequirements = svc.SetWidgetRequirements

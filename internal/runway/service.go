@@ -41,9 +41,11 @@ type Options struct {
 	StatusPath          string // status.json (written when ExportsStatusJSON)
 
 	// Grok, Claude and ResetToday are optional providers (see providers.go).
+	// Meters holds the quota-only providers keyed by store.Provider.
 	Grok       GrokProvider
 	Claude     ClaudeProvider
 	ResetToday ResetTodayProvider
+	Meters     map[store.Provider]MeterProvider
 
 	// WidgetSink receives the widget snapshot when the widget schedule is
 	// due; nil disables widgets. WidgetRequirements is the data the active
@@ -235,6 +237,11 @@ func New(o Options) *Service {
 	}
 	if o.ResetToday != nil {
 		o.ResetToday.SetOnChange(s.publish)
+	}
+	for _, provider := range MeterProviders() {
+		if m := o.Meters[provider]; m != nil {
+			m.SetOnChange(s.publish)
+		}
 	}
 	return s
 }

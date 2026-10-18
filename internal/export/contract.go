@@ -26,6 +26,12 @@ const (
 	ProviderCodex  Provider = "codex"
 	ProviderGrok   Provider = "grok"
 	ProviderClaude Provider = "claude"
+	// The quota-only providers mirror the store values; widgets and the
+	// status file key their blocks by these strings.
+	ProviderCursor Provider = "cursor"
+	ProviderKimi   Provider = "kimi"
+	ProviderZai    Provider = "zai"
+	ProviderAgy    Provider = "agy"
 )
 
 // ProviderScope is which providers a widget shows.

@@ -1,0 +1,64 @@
+{
+  "conversation_id": "",
+  "status": "SUCCESS",
+  "response": "Gemini Models\tWeekly Limit Remaining\t99%\t2026-08-21T22:08:38Z\nGemini Models\tFive Hour Limit Remaining\t96%\t2026-08-16T00:30:40Z\nClaude and GPT models\tWeekly Limit Remaining\t100%\t2026-08-22T21:03:47Z\nClaude and GPT models\tFive Hour Limit Remaining\t100%\t2026-08-16T02:03:47Z\n",
+  "duration_seconds": 0,
+  "num_turns": 0,
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "thinking_tokens": 0,
+    "cache_read_tokens": 0,
+    "total_tokens": 0
+  },
+  "command": {
+    "name": "usage",
+    "data": {
+      "description": "Synthetic shared quota description",
+      "groups": [
+        {
+          "name": "Gemini Models",
+          "description": "Synthetic Gemini group",
+          "buckets": [
+            {
+              "id": "gemini-weekly",
+              "name": "Weekly Limit Remaining",
+              "description": "Synthetic weekly reset description",
+              "window": "weekly",
+              "remaining_fraction": 0.9925113320350647,
+              "reset_time": "2026-08-21T22:08:38Z"
+            },
+            {
+              "id": "gemini-5h",
+              "name": "Five Hour Limit Remaining",
+              "description": "Synthetic five-hour reset description",
+              "window": "5h",
+              "remaining_fraction": 0.9606873989105225,
+              "reset_time": "2026-08-16T00:30:40Z"
+            }
+          ]
+        },
+        {
+          "name": "Claude and GPT models",
+          "description": "Synthetic third-party model group",
+          "buckets": [
+            {
+              "id": "3p-weekly",
+              "name": "Weekly Limit Remaining",
+              "window": "weekly",
+              "remaining_fraction": 1,
+              "reset_time": "2026-08-22T21:03:47Z"
+            },
+            {
+              "id": "3p-5h",
+              "name": "Five Hour Limit Remaining",
+              "window": "5h",
+              "remaining_fraction": 1,
+              "reset_time": "2026-08-16T02:03:47Z"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

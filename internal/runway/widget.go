@@ -143,11 +143,82 @@ func claudeWidgetProvider(g ClaudeState, p store.Preferences) export.ProviderSna
 	})
 }
 
+// meterExportProvider maps a quota-only provider to its export identifier.
+func meterExportProvider(p store.Provider) export.Provider {
+	switch p {
+	case store.ProviderCursor:
+		return export.ProviderCursor
+	case store.ProviderKimi:
+		return export.ProviderKimi
+	case store.ProviderZai:
+		return export.ProviderZai
+	case store.ProviderAgy:
+		return export.ProviderAgy
+	}
+	return export.Provider(p)
+}
+
+// meterAvailability maps a meter availability to the export value.
+func meterAvailability(a MeterAvailability) export.Availability {
+	switch a {
+	case MeterReady:
+		return export.Available
+	case MeterLoading, MeterError:
+		return export.Unavailable
+	}
+	return export.NotLoggedIn
+}
+
+// meterHasData reports whether a meter state carries anything to export; a
+// provider without a detected credential stays absent from the files.
+func meterHasData(m MeterState) bool {
+	return m.Availability != MeterNotConfigured
+}
+
+// meterWidgetSnapshot is the export block of a quota-only provider. Model-
+// specific rows are dropped when modelSpecific is false (the widget's
+// preference filter); the status export passes true so readers filter.
+func meterWidgetSnapshot(p store.Provider, m MeterState, modelSpecific bool) (export.ProviderSnapshot, bool) {
+	if !meterHasData(m) {
+		return export.ProviderSnapshot{}, false
+	}
+	out := export.ProviderSnapshot{
+		Provider: meterExportProvider(p), Availability: meterAvailability(m.Availability),
+		TokenSource: export.TokensThisMac,
+	}
+	if m.Plan != "" {
+		plan := m.Plan
+		out.Plan = &plan
+	}
+	out.UpdatedAt = timePtr(m.FetchedAt)
+	for _, q := range m.Meters {
+		if q.Source == SourceModelSpecific && !modelSpecific {
+			continue
+		}
+		out.Quota = append(out.Quota, widgetQuota(q))
+	}
+	return export.NewProviderSnapshot(out), true
+}
+
+// meterWidgetProviders appends the quota-only providers that have data.
+func meterWidgetProviders(snap Snapshot, prefs store.Preferences) []export.ProviderSnapshot {
+	var out []export.ProviderSnapshot
+	for _, p := range MeterProviders() {
+		if ms, ok := snap.Meters[p]; ok {
+			if w, has := meterWidgetSnapshot(p, ms, prefs.ShowsModelSpecificQuotaUsage); has {
+				out = append(out, w)
+			}
+		}
+	}
+	return out
+}
+
 // makeWidgetSnapshot builds the widget file content from a snapshot.
 func makeWidgetSnapshot(snap Snapshot, p store.Preferences, now time.Time) export.Snapshot {
 	providers := []export.ProviderSnapshot{
 		codexWidgetProvider(snap.Codex), grokWidgetProvider(snap.Grok, p), claudeWidgetProvider(snap.Claude, p),
 	}
+	providers = append(providers, meterWidgetProviders(snap, p)...)
 	return export.NewSnapshot(now, snap.Language, providers, snap.ResetToday.Widget)
 }
 

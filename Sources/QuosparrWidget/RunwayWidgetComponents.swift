@@ -217,6 +217,10 @@ func providerName(_ provider: RunwayProvider, l10n: L10n) -> String {
     case .codex: l10n.text(.widgetProviderCodex)
     case .grok: l10n.text(.widgetProviderGrok)
     case .claude: l10n.text(.widgetProviderClaude)
+    case .cursor: "Cursor"
+    case .kimi: "Kimi"
+    case .zai: "Z.ai"
+    case .agy: "Antigravity"
     }
 }
 

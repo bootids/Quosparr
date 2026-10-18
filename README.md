@@ -8,7 +8,7 @@ English · [简体中文](./README_ZH.md) · [繁體中文](./README_ZH_HANT.md)
 
 <sub><i>Named from <b>Quo</b>ta + <b>Sparr</b>ow</i></sub>
 
-A small sparrow perched in your menu bar, keeping watch over your Codex, Claude, and Grok quota.
+A small sparrow perched in your menu bar, keeping watch over your Codex, Claude, and Grok quota, plus read-only quota meters for Cursor, Kimi, Z.ai, and Antigravity.
 
 Quosparr is a native menu bar / system tray app for macOS, Windows, and Linux. It shows Codex, Claude Code, and Grok subscription quota, reset credits, API-equivalent cost, and local sessions, with separate account management for each provider.
 
@@ -39,6 +39,12 @@ Quosparr is a native menu bar / system tray app for macOS, Windows, and Linux. I
 - Included quota, Build / Imagine / Chat breakdown, weekly / monthly periods, prepaid balance, and on-demand usage via the official CLI chat-proxy billing API.
 - Multiple OAuth / SuperGrok accounts with isolated sign-in, current-login import, credential paste, refresh, aliases, ordering, and explicit switching.
 - Recent sessions from local Grok CLI logs.
+
+**Quota meters**
+
+- Cursor: subscription usage summary read from the local editor state (read-only): plan, overall, on-demand and team pools with dollar amounts and the billing reset date.
+- Kimi Code: weekly pool and rate-limit windows from the local Kimi CLI credential or KIMI_CODE_API_KEY; read-only.
+- Z.ai Coding Plan: API key stored only in Quosparr's own account store (intl/cn region), showing token/credit/tool pools and a 7-day model usage summary; Antigravity: remaining quota of each pool via the local `agy` CLI. All four are selectable in the panel, status bar and floating window; credentials never leave the machine except to the provider's own endpoint.
 
 **All providers**
 

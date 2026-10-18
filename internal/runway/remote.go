@@ -389,11 +389,12 @@ func BuildRemoteSnapshot(st export.StatusSnapshot, prefs store.Preferences, lc l
 	}
 	snap.Grok = remoteGrokState(providers, grokPB, prefs, lc, now)
 	snap.Claude = remoteClaudeState(providers, claudePB, prefs, lc, now)
+	snap.Meters = remoteMeterStates(panel, prefs, lc, now)
 	snap.ResetToday = remoteResetToday(providers, lc, now)
 	in := StatusInputs{
 		Prefs: prefs, Provider: prefs.SelectedProvider,
 		CodexText: snap.Codex.StatusText, CodexMeters: snap.Codex.Meters,
-		Grok: snap.Grok, Claude: snap.Claude, Now: now,
+		Grok: snap.Grok, Claude: snap.Claude, Meters: snap.Meters, Now: now,
 	}
 	snap.StatusBar = BuildStatusBar(lc, in)
 	if prefs.FloatingWindow.Enabled {
@@ -603,6 +604,55 @@ func remoteResetState(s export.ResetState) resettoday.State {
 	default:
 		return resettoday.StateUnknown
 	}
+}
+
+// remoteMeterStates rebuilds the quota-only providers from the panel's
+// meters block; a missing or empty block leaves them empty.
+func remoteMeterStates(panel *export.StatusPanel, prefs store.Preferences, lc l10n.Localizer, now time.Time) map[store.Provider]MeterState {
+	if panel == nil || len(panel.Meters) == 0 {
+		return nil
+	}
+	var out map[store.Provider]MeterState
+	for key, b := range panel.Meters {
+		p := store.Provider(key)
+		if !slices.Contains(MeterProviders(), p) {
+			continue
+		}
+		if out == nil {
+			out = map[store.Provider]MeterState{}
+		}
+		out[p] = MeterState{
+			Availability: remoteMeterAvailability(b.Availability), Plan: b.Plan,
+			Meters: widgetMeters(lc, b.Meters, prefs, now), Detail: remoteDetailLines(b.Detail),
+			FetchedAt: derefTime(b.FetchedAt),
+		}
+	}
+	return out
+}
+
+// remoteMeterAvailability reverses meterAvailabilityText.
+func remoteMeterAvailability(s string) MeterAvailability {
+	switch s {
+	case "loading":
+		return MeterLoading
+	case "ready":
+		return MeterReady
+	case "error":
+		return MeterError
+	}
+	return MeterNotConfigured
+}
+
+// remoteDetailLines restores the panel detail rows.
+func remoteDetailLines(rows []export.PanelDetailLine) []DetailLine {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]DetailLine, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, DetailLine{Title: r.Title, Value: r.Value})
+	}
+	return out
 }
 
 func grokAvailability(a export.Availability) GrokAvailability {

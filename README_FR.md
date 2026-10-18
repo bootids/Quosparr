@@ -8,7 +8,7 @@
 
 <sub><i>Nom formé de <b>Quo</b>ta (quota) + <b>Sparr</b>ow (moineau)</i></sub>
 
-Un petit moineau perché dans votre barre de menus, qui veille sur vos quotas Codex, Claude et Grok.
+Un petit moineau perché dans votre barre de menus, qui veille sur vos quotas Codex, Claude et Grok, et affiche aussi des compteurs de quota en lecture seule pour Cursor, Kimi, Z.ai et Antigravity.
 
 Quosparr est une application native de barre de menus / zone de notification pour macOS, Windows et Linux. Elle affiche les quotas Codex, d’abonnement Claude Code et Grok, les reset credits, le coût équivalent API et les sessions locales, avec une gestion des comptes séparée pour chaque fournisseur.
 
@@ -39,6 +39,12 @@ Quosparr est une application native de barre de menus / zone de notification pou
 - Quota inclus, répartition Build / Imagine / Chat, périodes hebdomadaires / mensuelles, solde prépayé et usage à la demande via l’API de facturation officielle CLI chat-proxy.
 - Plusieurs comptes OAuth / SuperGrok avec connexion isolée, import de la connexion actuelle, collage d’identifiants, actualisation, alias, ordre et basculement explicite.
 - Sessions récentes issues des journaux locaux du CLI Grok.
+
+**Compteurs de quota**
+
+- Cursor : résumé de l’usage de l’abonnement lu depuis l’état local de l’éditeur (lecture seule) : plan, pools global, à la demande et équipe avec leurs montants en dollars, et la date de réinitialisation de la facturation.
+- Kimi Code : pool hebdomadaire et fenêtres de limite de débit depuis l’identifiant local du CLI Kimi ou KIMI_CODE_API_KEY ; lecture seule.
+- Z.ai Coding Plan : clé API stockée uniquement dans le magasin de comptes de Quosparr lui-même (région intl/cn), affichant les pools de jetons/crédits/outils et un résumé d’usage des modèles sur 7 jours ; Antigravity : quota restant de chaque pool via le CLI local `agy`. Les quatre sont sélectionnables dans le panneau, la barre d’état et la fenêtre flottante ; les identifiants ne quittent jamais la machine, sauf vers le point d’accès du fournisseur lui-même.
 
 **Tous les fournisseurs**
 

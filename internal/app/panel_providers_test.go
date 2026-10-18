@@ -59,8 +59,8 @@ func TestPanelProviderScopeStartsFromEveryProvider(t *testing.T) {
 	tt.Key(0, ui.KeyDown)
 	tt.Key(0, ui.KeyEnter)
 	tt.Frame()
-	if got := e.s.Prefs().PanelProviders; !slices.Equal(got, store.Providers()) {
-		t.Fatalf("custom starts as %v, want every provider", got)
+	if got := e.s.Prefs().PanelProviders; !slices.Equal(got, selectableProviders()) {
+		t.Fatalf("custom starts as %v, want every selectable provider", got)
 	}
 	if !tt.HasText(checks) {
 		t.Fatal("custom mode did not show the checks")

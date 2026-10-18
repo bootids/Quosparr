@@ -8,5 +8,9 @@ type StatusProviders struct {
 	Codex      *ProviderSnapshot   `json:"codex,omitempty"`
 	Grok       *ProviderSnapshot   `json:"grok,omitempty"`
 	Claude     *ProviderSnapshot   `json:"claude,omitempty"`
+	Cursor     *ProviderSnapshot   `json:"cursor,omitempty"`
+	Kimi       *ProviderSnapshot   `json:"kimi,omitempty"`
+	Zai        *ProviderSnapshot   `json:"zai,omitempty"`
+	Agy        *ProviderSnapshot   `json:"agy,omitempty"`
 	ResetToday *ResetTodaySnapshot `json:"resetToday,omitempty"`
 }

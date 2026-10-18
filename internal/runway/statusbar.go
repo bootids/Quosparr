@@ -167,6 +167,8 @@ type StatusInputs struct {
 	Grok GrokState
 	// Claude side. The preferred status window is 5 hours, then 7 days.
 	Claude ClaudeState
+	// Meters holds the quota-only providers keyed by store.Provider.
+	Meters map[store.Provider]MeterState
 	Now    time.Time
 }
 
@@ -191,6 +193,28 @@ func GrokStatusText(lc l10n.Localizer, g GrokState, now time.Time) string {
 	return percentText(m)
 }
 
+// MeterStatusText is the status text of a quota-only provider (cursor, kimi,
+// zai, agy): the countdown of the first meter, its remaining percentage or
+// balance amount, or the availability fallback.
+func MeterStatusText(lc l10n.Localizer, m MeterState, now time.Time) string {
+	if len(m.Meters) == 0 {
+		switch m.Availability {
+		case MeterNotConfigured:
+			return lc.Text(l10n.KeyMeterNotConfigured)
+		case MeterLoading:
+			return lc.Text(l10n.KeyStatusWait)
+		case MeterReady:
+			return lc.Text(l10n.KeyStatusUnknown)
+		}
+		return lc.Text(l10n.KeyStatusError)
+	}
+	first := m.Meters[0]
+	if first.HasReset() {
+		return DurationLocalized(first.ResetsAt.Sub(now).Seconds(), lc.Language(), false)
+	}
+	return percentText(first)
+}
+
 // statusProviders is the ordered status-bar selection. An empty custom list
 // and the selected scope follow the main panel.
 func statusProviders(in StatusInputs) []store.Provider {
@@ -209,6 +233,8 @@ func statusTextFor(lc l10n.Localizer, in StatusInputs, p store.Provider) string 
 		return GrokStatusText(lc, in.Grok, in.Now)
 	case store.ProviderClaude:
 		return ClaudeStatusText(lc, in.Claude, in.Now)
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+		return MeterStatusText(lc, in.Meters[p], in.Now)
 	default:
 		return in.CodexText
 	}
@@ -279,9 +305,27 @@ func SelectedMeters(lc l10n.Localizer, in StatusInputs) []Meter {
 		return []Meter{WithShortTitle(lc, in.Grok.Meters[0])}
 	case store.ProviderClaude:
 		return claudeStatusMeters(lc, in.Claude.Meters)
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+		return meterStatusMeters(lc, metersOf(in, picked[0]))
 	default:
 		return nil
 	}
+}
+
+// meterStatusMeters is the single-provider status row of a quota-only
+// provider: the first standard window with its short title.
+func meterStatusMeters(lc l10n.Localizer, meters []Meter) []Meter {
+	if len(meters) == 0 {
+		return nil
+	}
+	m := meters[0]
+	for _, item := range meters {
+		if item.Source == SourceStandard {
+			m = item
+			break
+		}
+	}
+	return []Meter{WithShortTitle(lc, m)}
 }
 
 // claudeStatusMeters are the 5-hour and weekly meters with short titles;
@@ -316,6 +360,9 @@ func metersOf(in StatusInputs, p store.Provider) []Meter {
 		return in.Grok.Meters
 	case store.ProviderClaude:
 		return in.Claude.Meters
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+		// An absent entry is the zero MeterState: no meters, nothing to draw.
+		return in.Meters[p].Meters
 	default:
 		return in.CodexMeters
 	}
@@ -338,6 +385,14 @@ func providerStatusKey(p store.Provider) l10n.Key {
 		return l10n.KeyProviderGrok
 	case store.ProviderClaude:
 		return l10n.KeyProviderClaude
+	case store.ProviderCursor:
+		return l10n.KeyProviderCursor
+	case store.ProviderKimi:
+		return l10n.KeyProviderKimi
+	case store.ProviderZai:
+		return l10n.KeyProviderZai
+	case store.ProviderAgy:
+		return l10n.KeyProviderAgy
 	default:
 		return l10n.KeyProviderCodex
 	}

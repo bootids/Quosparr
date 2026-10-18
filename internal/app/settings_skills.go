@@ -50,7 +50,7 @@ func (u *settingsUI) skillsPageKey() string {
 func (u *settingsUI) skillsTabs(c *ui.Context, acts SkillActions) {
 	s := u.skillsState()
 	l, t := u.L(), c.Theme()
-	ps := store.Providers()
+	ps := skillsCLIProviders()
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 		seg := ui.SegmentedBase(c.Key("skills-tabs"), &s.tab, len(ps)+1)
 		seg.Track.Padding(3).Gap(2).Radius(7).Background(t.Text.Alpha(0.06)).Children(func() {
@@ -1141,7 +1141,7 @@ func (u *settingsUI) skillsTrash(c *ui.Context, acts SkillActions) {
 	})
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 		ui.TextInput(c.Key("skills-trash-search"), &tr.search).Placeholder(tx(l, xSkillsTrashSearch)).Label(tx(l, xSkillsTrashSearch)).Grow(1).Basis(0)
-		labels := append([]string{tx(l, xSkillsAll)}, providerTabLabels(l)...)
+		labels := append([]string{tx(l, xSkillsAll)}, providerLabels(l, skillsCLIProviders())...)
 		PillTabs(c.Key("skills-trash-provider"), &tr.provider, false, labels...)
 		if acts.TrashDir != "" && IconButton(c, icFolder, tx(l, xSkillsOpenTrashDir), acts.OpenFolder == nil).Clicked() {
 			u.openSkillFolder(acts, acts.TrashDir)

@@ -48,9 +48,12 @@ type Snapshot struct {
 	Grok       GrokState
 	Claude     ClaudeState
 	ResetToday ResetTodayState
-	Refresh    RefreshView
-	StatusBar  StatusBarView
-	Floating   FloatingView
+	// Meters holds the quota-only providers keyed by store.Provider; the
+	// map is nil when the Service has no meter providers.
+	Meters    map[store.Provider]MeterState
+	Refresh   RefreshView
+	StatusBar StatusBarView
+	Floating  FloatingView
 }
 
 // AccountsView is the managed account list and the signed-in identity.

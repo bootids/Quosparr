@@ -109,6 +109,8 @@ func providerMeters(snap runway.Snapshot, p store.Provider) []runway.Meter {
 		return snap.Grok.Meters
 	case store.ProviderClaude:
 		return snap.Claude.Meters
+	case store.ProviderCursor, store.ProviderKimi, store.ProviderZai, store.ProviderAgy:
+		return snap.Meters[p].Meters
 	default:
 		return snap.Codex.Meters
 	}

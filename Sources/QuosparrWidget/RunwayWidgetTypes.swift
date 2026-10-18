@@ -7,6 +7,10 @@ public enum RunwayProvider: String, Codable, CaseIterable, Sendable {
     case codex
     case grok
     case claude
+    case cursor
+    case kimi
+    case zai
+    case agy
 }
 
 public enum ResolvedLanguage: String, CaseIterable, Codable, Sendable, Equatable {

@@ -14,12 +14,18 @@ func providerKey(v store.Provider) l10n.Key {
 		return l10n.KeyProviderGrok
 	case store.ProviderClaude:
 		return l10n.KeyProviderClaude
+	case store.ProviderCursor:
+		return l10n.KeyProviderCursor
+	case store.ProviderKimi:
+		return l10n.KeyProviderKimi
+	case store.ProviderZai:
+		return l10n.KeyProviderZai
+	case store.ProviderAgy:
+		return l10n.KeyProviderAgy
 	default:
 		return l10n.KeyProviderCodex
 	}
 }
-
-func providerTabLabels(l l10n.Localizer) []string { return providerLabels(l, store.Providers()) }
 
 func providerLabels(l l10n.Localizer, providers []store.Provider) []string {
 	labels := make([]string, 0, len(providers))

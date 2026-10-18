@@ -38,7 +38,49 @@ func statusExportPanel(snap Snapshot) *export.StatusPanel {
 		}
 		p.Claude = b
 	}
+	fillMeterPanelBlocks(p, snap)
 	return p
+}
+
+// fillMeterPanelBlocks adds the quota-only providers that have data, keyed
+// by their provider string.
+func fillMeterPanelBlocks(p *export.StatusPanel, snap Snapshot) {
+	for _, sp := range MeterProviders() {
+		ms, ok := snap.Meters[sp]
+		if !ok || !meterHasData(ms) {
+			continue
+		}
+		if p.Meters == nil {
+			p.Meters = map[string]export.MeterPanelBlock{}
+		}
+		p.Meters[string(sp)] = meterPanelBlock(ms)
+	}
+}
+
+// meterPanelBlock mirrors one quota-only provider for the remote panel.
+func meterPanelBlock(m MeterState) export.MeterPanelBlock {
+	b := export.MeterPanelBlock{Availability: meterAvailabilityText(m.Availability), Plan: m.Plan}
+	for _, q := range m.Meters {
+		b.Meters = append(b.Meters, widgetQuota(q))
+	}
+	for _, d := range m.Detail {
+		b.Detail = append(b.Detail, export.PanelDetailLine{Title: d.Title, Value: d.Value})
+	}
+	b.FetchedAt = timePtr(m.FetchedAt)
+	return b
+}
+
+// meterAvailabilityText is the panel block's availability string.
+func meterAvailabilityText(a MeterAvailability) string {
+	switch a {
+	case MeterLoading:
+		return "loading"
+	case MeterReady:
+		return "ready"
+	case MeterError:
+		return "error"
+	}
+	return "notConfigured"
 }
 
 // codexPanelBlock fills the Codex block from the snapshot's Codex view and

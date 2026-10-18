@@ -6,6 +6,9 @@ import "slices"
 // values are stored on disk and read by the Swift app, so they must not change.
 
 // Provider is the platform selected in the main panel (Swift RunwayProvider).
+// The four quota-only providers (cursor, kimi, zai, agy) are Go-only
+// additions: unknown values are dropped by frozen Swift documents, so the
+// stored strings must stay stable.
 type Provider string
 
 // Provider values.
@@ -13,10 +16,20 @@ const (
 	ProviderCodex  Provider = "codex"
 	ProviderClaude Provider = "claude"
 	ProviderGrok   Provider = "grok"
+	// ProviderCursor is the Cursor subscription quota (read-only state.vscdb).
+	ProviderCursor Provider = "cursor"
+	// ProviderKimi is the Kimi Code quota (read-only credentials file).
+	ProviderKimi Provider = "kimi"
+	// ProviderZai is the Z.ai Coding Plan quota (managed API key account).
+	ProviderZai Provider = "zai"
+	// ProviderAgy is the Antigravity CLI usage (read-only agy subprocess).
+	ProviderAgy Provider = "agy"
 )
 
 // Providers returns every valid Provider, in display order.
-func Providers() []Provider { return []Provider{ProviderCodex, ProviderClaude, ProviderGrok} }
+func Providers() []Provider {
+	return []Provider{ProviderCodex, ProviderClaude, ProviderGrok, ProviderCursor, ProviderKimi, ProviderZai, ProviderAgy}
+}
 
 // Valid reports whether v is a known value.
 func (v Provider) Valid() bool { return slices.Contains(Providers(), v) }

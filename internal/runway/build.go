@@ -34,13 +34,21 @@ func (s *Service) buildLocked(now time.Time) Snapshot {
 	if s.opts.Claude != nil {
 		snap.Claude = s.opts.Claude.State(now)
 	}
+	if len(s.opts.Meters) > 0 {
+		snap.Meters = make(map[store.Provider]MeterState, len(s.opts.Meters))
+		for _, provider := range MeterProviders() {
+			if m := s.opts.Meters[provider]; m != nil {
+				snap.Meters[provider] = m.State(now)
+			}
+		}
+	}
 	if s.opts.ResetToday != nil {
 		snap.ResetToday = s.opts.ResetToday.State(now)
 	}
 	in := StatusInputs{
 		Prefs: s.prefs, Provider: s.prefs.SelectedProvider,
 		CodexText: snap.Codex.StatusText, CodexMeters: snap.Codex.Meters,
-		Grok: snap.Grok, Claude: snap.Claude, Now: now,
+		Grok: snap.Grok, Claude: snap.Claude, Meters: snap.Meters, Now: now,
 	}
 	snap.StatusBar = BuildStatusBar(lc, in)
 	if s.prefs.FloatingWindow.Enabled {
