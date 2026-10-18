@@ -81,6 +81,24 @@ func TestOpeningThePanelLoadsOnlyItsProviderLocalData(t *testing.T) {
 	}
 }
 
+func TestClosedPanelExportStillScansLocalData(t *testing.T) {
+	s, f, g, c, reports := localService(t)
+	p := s.Preferences()
+	p.ExportsStatusJSON = true
+	s.SetPreferences(p)
+	refreshAll(t, s)
+	settle(t, s)
+	// The status export mirrors the whole panel, so the local data of all
+	// three providers loads even with the panel closed: the estimate rows,
+	// the official stats, the local scans and both provider scans.
+	if got := localCounts(f, reports); got[0] == 0 || got[1] == 0 || got[2] == 0 {
+		t.Fatalf("codex local data missing with the export on: %v", got)
+	}
+	if g.localCount() == 0 || c.localCount() == 0 {
+		t.Fatalf("provider scans missing with the export on: grok %d, claude %d", g.localCount(), c.localCount())
+	}
+}
+
 func TestSwitchingWithThePanelClosedLoadsNothing(t *testing.T) {
 	s, _, g, c, _ := localService(t)
 	p := s.Preferences()

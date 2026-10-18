@@ -469,15 +469,19 @@ func (s *Service) startFull(policy usage.RefreshPolicy, widgets bool) <-chan str
 		wantsGrok := s.quotaWantedLocked(store.ProviderGrok)
 		wantsClaude := s.quotaWantedLocked(store.ProviderClaude)
 		// Local data is the open panel's provider only, or every provider
-		// when this refresh carries a widget write that needs it.
+		// when this refresh carries a widget write that needs it; the status
+		// export mirrors the whole panel, so it needs everyone's local data
+		// too.
 		widgetLocal := widgets && s.widgetLocalLocked()
+		exportLocal := s.prefs.ExportsStatusJSON
 		local := localScope{
 			panel:      s.panelLocalLocked(store.ProviderCodex),
 			widgetCost: widgets && s.widgetReqs.Has(export.RequireCost),
 			widgetHeat: widgets && s.widgetReqs.Has(export.RequireTokenTrend),
+			export:     exportLocal,
 		}
-		grokLocal := widgetLocal || s.panelLocalLocked(store.ProviderGrok)
-		claudeLocal := widgetLocal || s.panelLocalLocked(store.ProviderClaude)
+		grokLocal := widgetLocal || exportLocal || s.panelLocalLocked(store.ProviderGrok)
+		claudeLocal := widgetLocal || exportLocal || s.panelLocalLocked(store.ProviderClaude)
 		s.mu.Unlock()
 		report := func(err error, shown bool) {
 			if err != nil && ctx.Err() == nil && shown {
@@ -502,6 +506,12 @@ func (s *Service) startFull(policy usage.RefreshPolicy, widgets bool) <-chan str
 			if claudeLocal {
 				report(c.RefreshLocal(ctx), showsClaude)
 			}
+		}
+		if exportLocal {
+			// The export mirrors the Codex sessions and speed as well; the
+			// panel-open path only covers an open Codex panel.
+			s.loadRecentSessions(ctx)
+			s.loadSpeed(ctx)
 		}
 		s.refreshNow(ctx, policy, local)
 		cancel()
@@ -574,13 +584,14 @@ func (s *Service) cancelAccountScoped() {
 	}
 }
 
-// localScope is the Codex local data a full refresh owes: everything the
-// panel shows while it is open on Codex, and the cost or token chart a widget
-// write needs.
+// localScope is the local data a full refresh owes: everything the open panel
+// shows on its provider, the cost or token chart a widget write needs, and
+// the whole panel mirror the status export carries.
 type localScope struct {
 	panel      bool
 	widgetCost bool
 	widgetHeat bool
+	export     bool
 }
 
 // refreshNow is the Codex part of a full refresh (Swift refreshNow): the
@@ -672,7 +683,7 @@ func (s *Service) refreshLegs(ctx context.Context, auth codex.Auth, gen uint64, 
 
 	var remote error
 	if qErr == nil {
-		if local.panel && prefs.ShowsQuotaEstimateSummary {
+		if (local.panel && prefs.ShowsQuotaEstimateSummary) || local.export {
 			s.loadEstimate(ctx, auth, gen, quota)
 		}
 		s.scanAfterQuota(ctx, auth, gen, quota, policy, local)
@@ -693,9 +704,9 @@ func (s *Service) scanAfterQuota(ctx context.Context, auth codex.Auth, gen uint6
 	now := s.now()
 	s.mu.Lock()
 	p := s.prefs
-	needsCost := (local.panel && p.ShowsCostSummary || local.widgetCost) &&
+	needsCost := (local.panel && p.ShowsCostSummary || local.widgetCost || local.export) &&
 		shouldRefreshCost(policy, s.lastCostDone, s.lastCostCycle, &quota, s.refreshInterval(), now)
-	needsHeat := (local.panel && p.ShowsTokenUsageHeatmap || local.widgetHeat) &&
+	needsHeat := (local.panel && p.ShowsTokenUsageHeatmap || local.widgetHeat || local.export) &&
 		shouldRefreshHeatmap(policy, s.lastHeatDone, s.refreshInterval(), now)
 	s.mu.Unlock()
 	if !needsCost && !needsHeat {

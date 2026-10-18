@@ -59,6 +59,11 @@ Handoff: out/20261018-remote-panel-parity/HANDOFF.md
 
 ## Current state and next action
 
+
+### 部署补记（2026-10-18 下午，实机 10.10.10.20 → 10.10.10.22）
+
+- 实机部署发现：本地扫描（成本/图表/会话/速度/推算）原本只在面板打开时运行（`panelOpen` 门控），开发机重启后面板未开 → status.json 的 panel 块缺 estimate/speed/cost/图表/会话，MacBook 镜像退化为空模块。修复（沿用 `widgetLocal` 先例）：`exportsStatusJSON` 开启时完整刷新对所有供应商做本地扫描——`localScope.export` 驱动 grok/claude `RefreshLocal`、codex `loadRecentSessions`/`loadSpeed`、estimate 与 cost/heatmap 扫描门控（`TestClosedPanelExportStillScansLocalData` 回归）。
+- 重新打包部署两端后（本机数据源 + MacBook 均为新构建）：本机开机即写出全量 panel 块（estimate/speed/credits/318 天全设备 + 9 天本机序列/账号/claude 成本与 6 天序列），MacBook 拉取后 widget 镜像 `generatedAt=2026-10-18T06:14:31Z` 同步携带 codex 318 天、claude 6 天序列与全部配额行；进程驻留。MacBook 远程配置复核：remoteSource → 10.10.10.20 默认目录。
 - 2026-10-18：M1–M5 完成，链关闭。三切片落地后 orchestrator 集成修复：`codexPanelBlock` 导出/导入重名（导入侧改 `panelCodexBlock`）、S2 泛型 `line()` 方法约束不可编译（改为函数参数 `grokQuotaLine`/`claudeQuotaLine`）、S2 测试 `decimal.MustDecimal`→`MustParse` 与缺失 `apiquota` import、S3 测试 `CachedQuota`→冻结字段 `Quota`、远程成本过滤改 UTC 日字符串半开区间（原 `RangeForWindow+time.Local` 在非 UTC 机上边界漂移）、`SetPreferences` 增加 wake 通道让间隔/语言改动即时生效（原实现要等旧 sleep 到期）、E2E fixture 补 `providers` 块（生产两块同写）且 `asOf` 固定为 2026-10-17 UTC。
 
 ## Validation evidence
