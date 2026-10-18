@@ -13,7 +13,11 @@ import (
 )
 
 func TestProviderIconsPreserveColorAndFollowTheme(t *testing.T) {
-	for _, data := range [][]byte{codexProviderSVG, grokProviderSVG, claudeProviderSVG} {
+	for _, data := range [][]byte{
+		codexProviderSVG, grokProviderSVG, claudeProviderSVG,
+		cursorProviderSVG, kimiMonoProviderSVG, zaiProviderSVG, agyProviderSVG,
+		deepseekProviderSVG, minimaxProviderSVG, pixellabProviderSVG, elevenlabsProviderSVG,
+	} {
 		svg, err := ui.ParseSVG(data)
 		if err != nil {
 			t.Fatal(err)
@@ -22,34 +26,60 @@ func TestProviderIconsPreserveColorAndFollowTheme(t *testing.T) {
 			t.Fatalf("provider intrinsic size is %v×%v", w, h)
 		}
 	}
+	// Every provider's logo must stay readable on both themes: the color
+	// artwork keeps its palette, the monochrome-only marks (grok, cursor,
+	// kimi, zai, elevenlabs) follow the text color like their call sites do.
+	monoMarks := map[store.Provider]bool{
+		store.ProviderGrok: true, store.ProviderCursor: true,
+		store.ProviderKimi: true, store.ProviderZai: true, store.ProviderElevenLabs: true,
+	}
+	providers := append([]store.Provider{}, store.Providers()...)
 	for _, dark := range []bool{false, true} {
 		tt := ui.NewTester(func(c *ui.Context) {
 			theme := applyTheme(c)
-			ui.Row(c).Fill().Background(theme.Background).Gap(12).Padding(12).Children(func() {
-				ProviderIcon(c, store.ProviderCodex, 48).Label("codex")
-				ProviderIcon(c, store.ProviderGrok, 48).Label("grok").TextColor(theme.Text)
+			ui.Row(c).Fill().Background(theme.Background).Gap(6).Padding(6).Children(func() {
+				for _, p := range providers {
+					icon := ProviderIcon(c, p, 32).Label(string(p))
+					if monoMarks[p] {
+						icon.TextColor(theme.Text)
+					}
+				}
 			})
-		}, 144, 72)
+		}, 560, 56)
 		tt.SetDark(dark)
-		codexBox, _ := tt.Find("codex")
-		grokBox, _ := tt.Find("grok")
-		if coloredProviderPixels(tt.Image(), codexBox) < 100 {
-			t.Fatal("Codex lost its official gradient")
-		}
 		bg := tt.Image().RGBAAt(0, 0)
-		contrast := 0
-		for y := int(grokBox.Y); y < int(grokBox.Y+grokBox.H); y++ {
-			for x := int(grokBox.X); x < int(grokBox.X+grokBox.W); x++ {
-				px := tt.Image().RGBAAt(x, y)
-				delta := int(px.R) - int(bg.R)
-				if delta > 120 || delta < -120 {
-					contrast++
+		for _, p := range providers {
+			box, ok := tt.Find(string(p))
+			if !ok {
+				t.Fatalf("icon of %s not found", p)
+			}
+			contrast := 0
+			for y := int(box.Y); y < int(box.Y+box.H); y++ {
+				for x := int(box.X); x < int(box.X+box.W); x++ {
+					px := tt.Image().RGBAAt(x, y)
+					for _, d := range []int{int(px.R) - int(bg.R), int(px.G) - int(bg.G), int(px.B) - int(bg.B)} {
+						if d > 100 || d < -100 {
+							contrast++
+							break
+						}
+					}
 				}
 			}
+			if contrast < 60 {
+				t.Fatalf("%s is not readable with dark=%v (%d contrast pixels)", p, dark, contrast)
+			}
 		}
-		if contrast < 100 {
-			t.Fatalf("Grok is not readable with dark=%v", dark)
-		}
+	}
+	// The Codex gradient must survive rendering, not just parsing.
+	tt := ui.NewTester(func(c *ui.Context) {
+		theme := applyTheme(c)
+		ui.Row(c).Fill().Background(theme.Background).Gap(12).Padding(12).Children(func() {
+			ProviderIcon(c, store.ProviderCodex, 48).Label("codex")
+		})
+	}, 96, 72)
+	codexBox, _ := tt.Find("codex")
+	if coloredProviderPixels(tt.Image(), codexBox) < 100 {
+		t.Fatal("Codex lost its official gradient")
 	}
 }
 
@@ -118,7 +148,7 @@ func TestProviderIconPreview(t *testing.T) {
 			theme := applyTheme(c)
 			ui.Column(c).Fill().Padding(20).Gap(16).Background(theme.Background).Children(func() {
 				ui.Row(c).Gap(18).Children(func() {
-					for _, provider := range []store.Provider{store.ProviderCodex, store.ProviderGrok, "unknown"} {
+					for _, provider := range append(store.Providers(), store.Provider("unknown")) {
 						ProviderIcon(c, provider, 48).TextColor(theme.Text)
 					}
 				})
@@ -126,7 +156,7 @@ func TestProviderIconPreview(t *testing.T) {
 				ProviderTabs(c.Key("compact"), &selected, false)
 				ProviderTabs(c.Key("disabled"), &selected, true, l.Text(l10n.KeyProviderCodex), l.Text(l10n.KeyProviderGrok))
 			})
-		}, 400, 240)
+		}, 820, 240)
 		tt.SetDark(dark)
 		name := "provider-icons-light.png"
 		if dark {

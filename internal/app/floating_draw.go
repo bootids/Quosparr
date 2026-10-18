@@ -74,15 +74,46 @@ func percentText(m runway.FloatingMeter) string {
 }
 
 func floatingProviderIcon(p *ui.Painter, prov store.Provider, r ui.Rect, k floatingInk) {
+	// The monochrome marks (grok, cursor, zai, elevenlabs) take the text
+	// color; the rest keep their official palette.
+	color, monoIcon := providerIconArtwork(prov)
+	if monoIcon != nil {
+		p.Icon(monoIcon, r, k.text)
+		return
+	}
+	if color != nil {
+		p.Image(color, r, ui.Contain)
+	}
+}
+
+// providerIconArtwork is the floating window's icon lookup: the color artwork
+// and, when the brand publishes a monochrome-only mark, that mark instead.
+func providerIconArtwork(prov store.Provider) (color *ui.SVG, monoIcon *ui.SVG) {
 	switch prov {
 	case store.ProviderCodex:
-		p.Image(codexProviderIcon, r, ui.Contain)
+		return codexProviderIcon, nil
 	case store.ProviderClaude:
-		p.Image(claudeProviderIcon, r, ui.Contain)
+		return claudeProviderIcon, nil
+	case store.ProviderKimi:
+		return nil, kimiMonoProviderIcon
+	case store.ProviderAgy:
+		return agyProviderIcon, nil
+	case store.ProviderDeepSeek:
+		return deepseekProviderIcon, nil
+	case store.ProviderMiniMax:
+		return minimaxProviderIcon, nil
+	case store.ProviderPixelLab:
+		return pixellabProviderIcon, nil
 	case store.ProviderGrok:
-		// The Grok mark is monochrome: it takes the text color.
-		p.Icon(grokProviderIcon, r, k.text)
+		return nil, grokProviderIcon
+	case store.ProviderCursor:
+		return nil, cursorProviderIcon
+	case store.ProviderZai:
+		return nil, zaiProviderIcon
+	case store.ProviderElevenLabs:
+		return nil, elevenlabsProviderIcon
 	}
+	return nil, nil
 }
 
 // floatingCornerRadius is the window card's corner radius; zero where the

@@ -23,17 +23,69 @@ var grokProviderSVG []byte
 //go:embed assets/providers/claude-color.svg
 var claudeProviderSVG []byte
 
-var (
-	codexProviderIcon  = ui.MustParseSVG(codexProviderSVG)
-	grokProviderIcon   = ui.MustParseSVG(grokProviderSVG)
-	claudeProviderIcon = ui.MustParseSVG(claudeProviderSVG)
+//go:embed assets/providers/cursor.svg
+var cursorProviderSVG []byte
 
-	codexMonoProviderIcon  = ui.MustParseSVG(codexMonoProviderSVG)
-	claudeMonoProviderIcon = ui.MustParseSVG(claudeMonoProviderSVG)
+//go:embed assets/providers/kimi.svg
+var kimiMonoProviderSVG []byte
+
+//go:embed assets/providers/zai.svg
+var zaiProviderSVG []byte
+
+//go:embed assets/providers/antigravity-color.svg
+var agyProviderSVG []byte
+
+//go:embed assets/providers/antigravity.svg
+var agyMonoProviderSVG []byte
+
+//go:embed assets/providers/deepseek-color.svg
+var deepseekProviderSVG []byte
+
+//go:embed assets/providers/deepseek.svg
+var deepseekMonoProviderSVG []byte
+
+//go:embed assets/providers/minimax-color.svg
+var minimaxProviderSVG []byte
+
+//go:embed assets/providers/minimax.svg
+var minimaxMonoProviderSVG []byte
+
+//go:embed assets/providers/pixellab-color.svg
+var pixellabProviderSVG []byte
+
+//go:embed assets/providers/pixellab.svg
+var pixellabMonoProviderSVG []byte
+
+//go:embed assets/providers/elevenlabs.svg
+var elevenlabsProviderSVG []byte
+
+var (
+	// The brands that publish monochrome-only marks.
+	cursorProviderIcon     = ui.MustParseSVG(cursorProviderSVG)
+	zaiProviderIcon        = ui.MustParseSVG(zaiProviderSVG)
+	elevenlabsProviderIcon = ui.MustParseSVG(elevenlabsProviderSVG)
+	kimiMonoProviderIcon   = ui.MustParseSVG(kimiMonoProviderSVG)
+
+	codexProviderIcon    = ui.MustParseSVG(codexProviderSVG)
+	grokProviderIcon     = ui.MustParseSVG(grokProviderSVG)
+	claudeProviderIcon   = ui.MustParseSVG(claudeProviderSVG)
+	agyProviderIcon      = ui.MustParseSVG(agyProviderSVG)
+	deepseekProviderIcon = ui.MustParseSVG(deepseekProviderSVG)
+	minimaxProviderIcon  = ui.MustParseSVG(minimaxProviderSVG)
+	pixellabProviderIcon = ui.MustParseSVG(pixellabProviderSVG)
+
+	codexMonoProviderIcon    = ui.MustParseSVG(codexMonoProviderSVG)
+	claudeMonoProviderIcon   = ui.MustParseSVG(claudeMonoProviderSVG)
+	agyMonoProviderIcon      = ui.MustParseSVG(agyMonoProviderSVG)
+	deepseekMonoProviderIcon = ui.MustParseSVG(deepseekMonoProviderSVG)
+	minimaxMonoProviderIcon  = ui.MustParseSVG(minimaxMonoProviderSVG)
+	pixellabMonoProviderIcon = ui.MustParseSVG(pixellabMonoProviderSVG)
 )
 
 // ProviderIcon preserves the official logo's colors; monochrome SVGs inherit
 // the text color. Unknown providers use the interface's neutral plug icon.
+// Cursor, Kimi, Z.ai and ElevenLabs publish monochrome-only marks, so their
+// logos follow the text color like Grok's.
 func ProviderIcon(c *ui.Context, provider store.Provider, size float32) ui.Element {
 	switch provider {
 	case store.ProviderCodex:
@@ -42,6 +94,22 @@ func ProviderIcon(c *ui.Context, provider store.Provider, size float32) ui.Eleme
 		return ui.Image(c, grokProviderIcon).Size(size, size)
 	case store.ProviderClaude:
 		return ui.Image(c, claudeProviderIcon).Size(size, size)
+	case store.ProviderCursor:
+		return ui.Image(c, cursorProviderIcon).Size(size, size)
+	case store.ProviderKimi:
+		return ui.Image(c, kimiMonoProviderIcon).Size(size, size)
+	case store.ProviderZai:
+		return ui.Image(c, zaiProviderIcon).Size(size, size)
+	case store.ProviderAgy:
+		return ui.Image(c, agyProviderIcon).Size(size, size)
+	case store.ProviderDeepSeek:
+		return ui.Image(c, deepseekProviderIcon).Size(size, size)
+	case store.ProviderMiniMax:
+		return ui.Image(c, minimaxProviderIcon).Size(size, size)
+	case store.ProviderPixelLab:
+		return ui.Image(c, pixellabProviderIcon).Size(size, size)
+	case store.ProviderElevenLabs:
+		return ui.Image(c, elevenlabsProviderIcon).Size(size, size)
 	default:
 		return ui.Icon(c, icPlug).Size(size, size).TextColor(c.Theme().TextMuted)
 	}
@@ -54,6 +122,16 @@ func ProviderMonoIcon(c *ui.Context, provider store.Provider, size float32) ui.E
 		return ui.Image(c, codexMonoProviderIcon).Size(size, size)
 	case store.ProviderClaude:
 		return ui.Image(c, claudeMonoProviderIcon).Size(size, size)
+	case store.ProviderKimi:
+		return ui.Image(c, kimiMonoProviderIcon).Size(size, size)
+	case store.ProviderAgy:
+		return ui.Image(c, agyMonoProviderIcon).Size(size, size)
+	case store.ProviderDeepSeek:
+		return ui.Image(c, deepseekMonoProviderIcon).Size(size, size)
+	case store.ProviderMiniMax:
+		return ui.Image(c, minimaxMonoProviderIcon).Size(size, size)
+	case store.ProviderPixelLab:
+		return ui.Image(c, pixellabMonoProviderIcon).Size(size, size)
 	default:
 		return ProviderIcon(c, provider, size)
 	}
