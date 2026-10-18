@@ -10,6 +10,9 @@ __pycache__/
 *.pyo
 /tmp/
 
+# Task-chain working outputs (see docs/PLANS.md); durable plans live in docs/exec-plans/
+/out/
+
 # Release workflow output
 /dist-v1/
 /release-notes.md

@@ -66,6 +66,17 @@ V1_DEVELOPMENT_PACKAGE=1 bash Scripts/package-v1-app.sh
 
 `go run . --self-check` 当前只检查基础目录、锁与文件存在性，并明确列出尚未移植的诊断；开发打包必须显式设置 `V1_DEVELOPMENT_PACKAGE=1`，生产默认 `0` 并要求发布环境中的更新签名私钥；Windows / Linux 交叉构建及完整发布校验见 `docs/v1-release.md`
 
+## 工作流与任务链
+
+- 规划深度按任务风险选择（详见 [docs/PLANS.md](docs/PLANS.md)），不按模型、预估时长或文件数定级：清晰、局部、可逆的低风险改动直接做；需要排序与验收的小改动记轻量计划；跨会话 / 跨贡献者、重大接口、大范围重构、高风险迁移或需要可审计恢复点的工作必须有 durable ExecPlan（`docs/exec-plans/<id>/PLAN.md`）
+- 任务链为「一个 ID + 一个版本化目录 + 一个非版本化目录」：`docs/exec-plans/<id>/` 只放持久记录（`PLAN.md` 固定名、探索链的 `EXPLORATION.md`、`recipe/` 小文本）；`out/<id>/` 放 HANDOFF、派发目录、日志与产物，不入库；`out/` 与 `out/scratch/` 必须保持被 `.gitignore` 忽略
+- 链 ID 为 `YYYYMMDD-<slug>`（slug 匹配 `[a-z0-9]+(-[a-z0-9]+)*`，整体 ≤48 字符），目录名等于 ID；新子话题开新链用 `parent:` 关联，不往现有链追加无关内容；被取代的工作写 `superseded_by:`，不删除
+- 状态只存在于 `PLAN.md` frontmatter（`draft | active | blocked | done | superseded | cancelled`）；不创建、不迁移旧的 `active/`、`completed/` 子目录；`TASK`、`REPORT`、返工记录、日志、HANDOFF 一律放 `out/<id>/`，不进计划目录
+- 实质工作开始前先查 `docs/exec-plans/INDEX.md`（存在时）与 `out/` 下的链目录再续链或新建；每条链同一时间只允许一个会话写入，只写自己链的文件；`INDEX.md` 及各登记表的生成块由 registry 工具（harness-init skill）生成，不手改；并行分支撞编号时由后合并方用 `--next` 重新编号并改掉所有引用
+- `out/<id>/HANDOFF.md` 首行为固定标记 `任务：<仓库目录名>-<id>`（工具解析前缀，不翻译不改格式），正文只记当前状态：目标、进度、下一步、本链未提交文件、关键路径；整页覆盖不追加，最多 60 行；持久结论写进 `PLAN.md` / `EXPLORATION.md`
+- 验证记录使用显式状态 `passed | failed | blocked | not run | not applicable`（附原因），写明工作目录、命令或可复现步骤、输入与环境、观察结果与证据位置；不编造命令、测试数量或结果；编译、启动、功能测试、打包验签、真机验收证明的是不同性质，分开陈述；`out/` 路径只能被尝试表与 PLAN 的证据记录引用，其他版本化文档需先提升（小文本拷入仓库）
+- 同一目标要比较多条候选路径且过程有价值时用 `kind: exploration`，`EXPLORATION.md` 按固定分节记录（问题与判据 / 候选 / 尝试 / 决策 / Recipe），尝试表只追加不改写历史；决策依据记录在案的尝试与判据，不凭记忆
+
 ## 文档规则
 
 - README 和源码不要包含外部参考应用名称、链接或代码片段。

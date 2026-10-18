@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "toolVersion": "2.0.0",
+  "options": {
+    "profile": "generic",
+    "engine": "auto",
+    "docsDir": "docs",
+    "claudeLink": true,
+    "capabilities": {
+      "database": true,
+      "local-save": true,
+      "networking": true,
+      "security": true
+    }
+  },
+  "files": {
+    "ARCHITECTURE.md": "0949643cba4d9894fe5b08f25f9425a7d05cbf66473180b469c1212fe7d8cf0d",
+    "docs/index.md": "04da85491cb29dbfe59e66219969c9217f84b56fc2a06afd34cf5a25c18d56af",
+    "docs/DEVELOPMENT.md": "3d2609ab99a7e38e43da8407b498136654c97370a6ba5af4f2cf24ee1291cd66",
+    "docs/PLANS.md": "6cc4ff6a9a5a6dec3be1fa9a55f4dbf75d155c258a4f49bb00d39d755644d896",
+    "docs/DATA_MODEL.md": "5d28ee4109e0794045da2e0c82a72950087638d30db8a6c5d01445e0a9ab1724",
+    "docs/SAVE_SYSTEM.md": "e4df46fc4b7193d06748dad11edcfcaa33dbd11d0d526d6b599d62e610b8a4f8",
+    "docs/NETWORKING.md": "f3c85a7d6b8eb74565869aad1539993f8606f4b5189b93454c1d1548dffa939e",
+    "docs/SECURITY.md": "3b05a673730734281a36bef76e9eb952c4a96e3e557741959a23dedd00fb8787"
+  }
+}
