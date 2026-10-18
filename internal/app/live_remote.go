@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/licoy/quosparr/internal/alerts"
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/remote"
 	"github.com/licoy/quosparr/internal/runway"
@@ -49,12 +50,15 @@ func (r *remoteRuntime) Preferences() store.Preferences {
 	return r.prefs.Clone()
 }
 
-// SetPreferences only updates the app-side copy; rendering choices encoded
-// in the remote fetcher apply after a restart.
+// SetPreferences stores the app-side copy and forwards the new preferences
+// to the remote service so rendering choices apply without a restart.
 func (r *remoteRuntime) SetPreferences(p store.Preferences) {
 	r.prefsMu.Lock()
 	r.prefs = p.Clone()
 	r.prefsMu.Unlock()
+	if r.RemoteService != nil {
+		r.RemoteService.SetPreferences(p)
+	}
 }
 
 func (r *remoteRuntime) SetWidgetRequirements(export.Requirements) {}
@@ -70,6 +74,12 @@ func (rt *liveApp) remoteMode() bool { return rt.remoteSvc != nil }
 func newRemoteRuntime(opts BackgroundOptions, prefs store.Preferences, langs []string) *liveApp {
 	src := prefs.RemoteSource
 	client := remote.New(remote.Config{Host: src.Host, Port: src.Port, Dir: src.Dir})
+	return newRemoteRuntimeWithFetcher(opts, prefs, langs, client)
+}
+
+// newRemoteRuntimeWithFetcher is the testable core of newRemoteRuntime: the
+// fetcher is injected so tests can drive the remote decode without SSH.
+func newRemoteRuntimeWithFetcher(opts BackgroundOptions, prefs store.Preferences, langs []string, fetcher runway.RemoteFetcher) *liveApp {
 	widgetRequirements := initialWidgetRequirements(opts.Settings)
 	widgets := newWidgetCoordinator(opts.Home, widgetRequirements != 0)
 	rt := &liveApp{widgets: widgets, version: opts.Version, langs: langs}
@@ -84,12 +94,19 @@ func newRemoteRuntime(opts BackgroundOptions, prefs store.Preferences, langs []s
 			_ = widgets.publish(svc.WidgetSnapshot(time.Now()))
 		}
 	}}
-	rr := &remoteRuntime{RemoteService: runway.NewRemote(runway.RemoteOptions{
-		Fetcher:         client,
+	rr := &remoteRuntime{prefs: prefs}
+	rr.RemoteService = runway.NewRemote(runway.RemoteOptions{
+		Fetcher:         fetcher,
 		Preferences:     prefs,
 		SystemLanguages: langs,
-		OnSnapshot:      func(snap runway.Snapshot) { dispatch.publish(snap); widgetUI.publish(snap) },
-	}), prefs: prefs}
+		AlertsPath:      alerts.DefaultPath(opts.Home),
+		OnEvent:         func(e runway.Event) { deliverEvent(opts, e) },
+		OnSnapshot: func(snap runway.Snapshot) {
+			snap = rebuildRemoteSnapshotDetail(snap, rr.RawStatus())
+			dispatch.publish(snap)
+			widgetUI.publish(snap)
+		},
+	})
 	svc = rr
 	rt.svc, rt.remoteSvc = rr, rr
 	widgets.onRequirements = rr.SetWidgetRequirements
@@ -99,6 +116,16 @@ func newRemoteRuntime(opts BackgroundOptions, prefs store.Preferences, langs []s
 	}
 	rt.dispatch, rt.widgetDispatch = dispatch, widgetUI
 	return rt
+}
+
+// rebuildRemoteSnapshotDetail restores what BuildRemoteSnapshot cannot carry
+// in the Snapshot itself: the Grok billing detail rebuilt from the exported
+// panel mirror, so the popover renders the remote data like the local one.
+func rebuildRemoteSnapshotDetail(snap runway.Snapshot, raw export.StatusSnapshot) runway.Snapshot {
+	if raw.Panel != nil && raw.Panel.Grok != nil && raw.Panel.Grok.Billing != nil {
+		snap.Grok.Detail = grokBillingFromPanel(raw.Panel.Grok.Billing)
+	}
+	return snap
 }
 
 // remotePanelActions is the read-only action set of the remote mode: the

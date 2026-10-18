@@ -126,6 +126,9 @@ type StatusSnapshot struct {
 	Cost        *CostSummary      `json:"cost,omitempty"`
 	Sessions    *sessions.Summary `json:"sessions,omitempty"`
 	Providers   *StatusProviders  `json:"providers,omitempty"`
+	// Panel is the extended read-only mirror the remote view renders from;
+	// nil on files written before it existed.
+	Panel *StatusPanel `json:"panel,omitempty"`
 }
 
 // StatusExporter writes status.json.

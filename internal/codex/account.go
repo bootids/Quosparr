@@ -264,6 +264,16 @@ func (a ManagedAccount) ResolvedDisplayName() string {
 	return firstNonEmpty(a.Alias, a.DisplayName, a.Email, a.Username, short, a.ID)
 }
 
+// DisplayNameWithoutEmail is the export variant of ResolvedDisplayName: the
+// same fallback chain with the email skipped, so status files never carry it.
+func (a ManagedAccount) DisplayNameWithoutEmail() string {
+	short := ""
+	if a.AccountID != "" {
+		short = shortenAccountID(a.AccountID)
+	}
+	return firstNonEmpty(a.Alias, a.DisplayName, a.Username, short, a.ID)
+}
+
 // shortenAccountID is the row-label variant of shortenID: it shortens the raw
 // text and leaves the untrimmed value of a short id alone.
 func shortenAccountID(v string) string {

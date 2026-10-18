@@ -841,6 +841,7 @@ func buildGrokState(mod *grok.Module, lc l10n.Localizer) runway.GrokState {
 	}
 	st.Widget = grokWidget(st)
 	st.Detail = snap
+	st.Billing = grokBillingToPanel(snap)
 	return st
 }
 

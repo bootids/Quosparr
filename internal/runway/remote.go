@@ -1,17 +1,23 @@
 package runway
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
+	"github.com/licoy/quosparr/internal/alerts"
+	"github.com/licoy/quosparr/internal/codex"
 	"github.com/licoy/quosparr/internal/codexapi"
+	"github.com/licoy/quosparr/internal/estimate"
 	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/export/swiftjson"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/sessions"
+	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/usage"
 	"github.com/licoy/quosparr/internal/usage/decimal"
@@ -33,6 +39,10 @@ type RemoteOptions struct {
 	// goroutine; intermediate snapshots may be skipped when the receiver is
 	// slow (the latest always arrives).
 	OnSnapshot func(Snapshot)
+	// OnEvent receives deduplicated alerts, as the local Service's events.
+	OnEvent func(Event)
+	// AlertsPath is the alert dedupe store; alerts are not delivered without it.
+	AlertsPath string
 	// Now replaces the clock; the default is time.Now.
 	Now func() time.Time
 }
@@ -41,12 +51,19 @@ type RemoteOptions struct {
 // RemoteFetcher, decodes the exported status file and rebuilds the same
 // Snapshot the UI renders locally. All methods are safe from any goroutine.
 type RemoteService struct {
-	fetcher  RemoteFetcher
-	prefs    store.Preferences
-	lc       l10n.Localizer
-	nowFn    func() time.Time
-	onSnap   func(Snapshot)
-	interval time.Duration
+	fetcher RemoteFetcher
+	nowFn   func() time.Time
+	onSnap  func(Snapshot)
+
+	// prefs, lc and interval are mutable through SetPreferences; mu guards
+	// them, so every reader copies them under the lock.
+	prefs      store.Preferences
+	sysLangs   []string
+	lc         l10n.Localizer
+	interval   time.Duration
+	wake       chan struct{}
+	onEvent    func(Event)
+	alertsPath string
 
 	root   context.Context
 	cancel context.CancelFunc
@@ -60,6 +77,9 @@ type RemoteService struct {
 	mu      sync.Mutex
 	seq     uint64
 	st      export.StatusSnapshot
+	rawSt   export.StatusSnapshot
+	haveRaw bool
+	good    Snapshot
 	errText string
 
 	pubMu  sync.Mutex
@@ -72,22 +92,61 @@ func NewRemote(opts RemoteOptions) *RemoteService {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	interval := time.Duration(opts.Preferences.RefreshIntervalSeconds) * time.Second
+	ctx, cancel := context.WithCancel(context.Background())
+	return &RemoteService{
+		fetcher:    opts.Fetcher,
+		prefs:      opts.Preferences,
+		sysLangs:   opts.SystemLanguages,
+		lc:         l10n.ForPreference(string(opts.Preferences.Language), opts.SystemLanguages),
+		nowFn:      opts.Now,
+		onSnap:     opts.OnSnapshot,
+		onEvent:    opts.OnEvent,
+		alertsPath: opts.AlertsPath,
+		interval:   remoteInterval(opts.Preferences),
+		root:       ctx,
+		cancel:     cancel,
+		pubSig:     make(chan struct{}, 1),
+		wake:       make(chan struct{}, 1),
+	}
+}
+
+func remoteInterval(p store.Preferences) time.Duration {
+	interval := time.Duration(p.RefreshIntervalSeconds) * time.Second
 	if interval <= 0 {
 		interval = time.Duration(store.DefaultRefreshIntervalSeconds) * time.Second
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	return &RemoteService{
-		fetcher:  opts.Fetcher,
-		prefs:    opts.Preferences,
-		lc:       l10n.ForPreference(string(opts.Preferences.Language), opts.SystemLanguages),
-		nowFn:    opts.Now,
-		onSnap:   opts.OnSnapshot,
-		interval: interval,
-		root:     ctx,
-		cancel:   cancel,
-		pubSig:   make(chan struct{}, 1),
+	return interval
+}
+
+// SetPreferences updates the language, the refresh interval and the rendering
+// preferences; the next fetch cycle picks them up. The fetcher's host
+// configuration keeps needing a restart, as before.
+func (s *RemoteService) SetPreferences(p store.Preferences) {
+	s.mu.Lock()
+	s.prefs = p
+	s.lc = l10n.ForPreference(string(p.Language), s.sysLangs)
+	s.interval = remoteInterval(p)
+	s.mu.Unlock()
+	// Wake the poll loop so a shorter interval (or a re-render under a new
+	// language) applies at once instead of after the previous sleep.
+	select {
+	case s.wake <- struct{}{}:
+	default:
 	}
+}
+
+func (s *RemoteService) currentInterval() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.interval
+}
+
+// RawStatus returns the status file of the last successful decode; the zero
+// value before the first one.
+func (s *RemoteService) RawStatus() export.StatusSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rawSt
 }
 
 func (s *RemoteService) now() time.Time { return s.nowFn() }
@@ -149,17 +208,23 @@ func (s *RemoteService) WidgetSnapshot(now time.Time) export.Snapshot {
 
 func (s *RemoteService) fetchLoop(ctx context.Context) {
 	s.fetchOnce(ctx)
-	t := time.NewTicker(s.interval)
-	defer t.Stop()
 	for {
+		// Re-read the interval every cycle so SetPreferences takes effect
+		// without a restart.
+		t := time.NewTimer(s.currentInterval())
 		select {
 		case <-s.root.Done():
+			t.Stop()
 			return
 		case <-ctx.Done():
+			t.Stop()
 			return
+		case <-s.wake:
+			// Preferences changed: drop the old sleep and refetch at once.
+			t.Stop()
 		case <-t.C:
-			s.fetchOnce(ctx)
 		}
+		s.fetchOnce(ctx)
 	}
 }
 
@@ -172,6 +237,7 @@ func (s *RemoteService) fetchOnce(ctx context.Context) {
 	defer s.fetchMu.Unlock()
 	s.setRefreshing(true)
 	errText := ""
+	decoded := false
 	data, err := s.fetcher.FetchStatus(ctx)
 	if err == nil {
 		var st export.StatusSnapshot
@@ -179,32 +245,50 @@ func (s *RemoteService) fetchOnce(ctx context.Context) {
 			err = errRemoteDecode
 		} else {
 			s.mu.Lock()
-			s.st = st
+			s.st, s.rawSt, s.haveRaw = st, st, true
 			s.mu.Unlock()
+			decoded = true
 		}
 	}
 	if err != nil {
+		s.mu.Lock()
+		lc := s.lc
+		s.mu.Unlock()
 		category := l10n.KeyRemoteSourceErrorFetch
 		if err == errRemoteDecode {
 			category = l10n.KeyRemoteSourceErrorDecode
 		}
-		errText = l10n.Format(s.lc.Text(l10n.KeyRemoteSourceUnavailable), s.lc.Text(category))
+		errText = l10n.Format(lc.Text(l10n.KeyRemoteSourceUnavailable), lc.Text(category))
 	}
 	s.mu.Lock()
 	s.errText = errText
 	s.mu.Unlock()
 	s.setRefreshing(false)
+	if decoded {
+		s.deliverRemoteAlerts()
+	}
 }
 
 func (s *RemoteService) setRefreshing(on bool) {
 	s.mu.Lock()
 	st, errText := s.st, s.errText
+	prefs, lc := s.prefs, s.lc
 	now := s.now()
 	var snap Snapshot
 	if errText != "" {
-		snap = remoteErrorSnapshot(errText, s.prefs, s.lc, now)
+		if s.haveRaw {
+			// Keep the last good data; only the error line changes.
+			snap = s.good
+			snap.GeneratedAt = now
+			snap.Codex.LastError = errText
+			snap.Grok.LastError = errText
+			snap.Claude.LastError = errText
+		} else {
+			snap = remoteErrorSnapshot(errText, prefs, lc, now)
+		}
 	} else {
-		snap = BuildRemoteSnapshot(st, s.prefs, s.lc, now)
+		snap = BuildRemoteSnapshot(st, prefs, lc, now)
+		s.good = snap
 	}
 	snap.Refresh.All = on
 	s.seq++
@@ -216,6 +300,33 @@ func (s *RemoteService) setRefreshing(on bool) {
 	select {
 	case s.pubSig <- struct{}{}:
 	default:
+	}
+}
+
+// deliverRemoteAlerts builds the alert candidates of the last decoded status
+// with the current preferences and hands the deduplicated new ones to OnEvent,
+// like the local Service's deliver.
+func (s *RemoteService) deliverRemoteAlerts() {
+	if s.alertsPath == "" {
+		return
+	}
+	s.mu.Lock()
+	st, prefs := s.st, s.prefs
+	s.mu.Unlock()
+	candidates := remoteAlertCandidates(st, prefs)
+	if len(candidates) == 0 {
+		return
+	}
+	unseen, err := (&alerts.Store{Path: s.alertsPath}).Unseen(candidates)
+	if err != nil {
+		s.mu.Lock()
+		s.errText = err.Error()
+		s.mu.Unlock()
+		s.setRefreshing(false)
+		return
+	}
+	if len(unseen) > 0 && s.onEvent != nil {
+		s.onEvent(Event{Kind: EventAlerts, Alerts: unseen})
 	}
 }
 
@@ -263,9 +374,20 @@ func BuildRemoteSnapshot(st export.StatusSnapshot, prefs store.Preferences, lc l
 	if providers != nil && providers.Codex != nil {
 		codex = providers.Codex
 	}
-	snap.Codex = remoteCodexView(st, codex, prefs, lc, now)
-	snap.Grok = remoteGrokState(providers, prefs, lc, now)
-	snap.Claude = remoteClaudeState(providers, prefs, lc, now)
+	var panel *export.StatusPanel
+	if st.Panel != nil {
+		panel = st.Panel
+	}
+	if panel != nil && panel.Codex != nil {
+		snap.Accounts = remoteAccountsView(panel.Codex)
+	}
+	snap.Codex = remoteCodexView(st, codex, panelCodexBlock(panel), prefs, lc, now)
+	var grokPB, claudePB *export.ProviderPanelBlock
+	if panel != nil {
+		grokPB, claudePB = panel.Grok, panel.Claude
+	}
+	snap.Grok = remoteGrokState(providers, grokPB, prefs, lc, now)
+	snap.Claude = remoteClaudeState(providers, claudePB, prefs, lc, now)
 	snap.ResetToday = remoteResetToday(providers, lc)
 	in := StatusInputs{
 		Prefs: prefs, Provider: prefs.SelectedProvider,
@@ -279,7 +401,14 @@ func BuildRemoteSnapshot(st export.StatusSnapshot, prefs store.Preferences, lc l
 	return snap
 }
 
-func remoteCodexView(st export.StatusSnapshot, p *export.ProviderSnapshot, prefs store.Preferences, lc l10n.Localizer, now time.Time) CodexView {
+func panelCodexBlock(panel *export.StatusPanel) *export.CodexPanelBlock {
+	if panel == nil {
+		return nil
+	}
+	return panel.Codex
+}
+
+func remoteCodexView(st export.StatusSnapshot, p *export.ProviderSnapshot, pb *export.CodexPanelBlock, prefs store.Preferences, lc l10n.Localizer, now time.Time) CodexView {
 	var v CodexView
 	if q := importStatusQuota(st.Quota); q != nil {
 		v.Quota = q
@@ -298,12 +427,9 @@ func remoteCodexView(st export.StatusSnapshot, p *export.ProviderSnapshot, prefs
 		v.RecentSessions = st.Sessions.Items
 		v.RecentSessionLines = recentSessionLines(lc, st.Sessions.Items)
 	}
-	if p != nil {
+	if p != nil && pb == nil {
 		if len(p.DailyTokens) > 0 {
-			tokens := map[string]int64{}
-			for _, d := range p.DailyTokens {
-				tokens[d.Date] = int64(d.Tokens)
-			}
+			tokens := dailyTokensMap(p.DailyTokens)
 			if p.TokenSource == export.TokensAllDevices {
 				v.Heatmap.AllDevices = tokens
 			} else {
@@ -311,18 +437,45 @@ func remoteCodexView(st export.StatusSnapshot, p *export.ProviderSnapshot, prefs
 			}
 			v.Heatmap.CalculatedAt = now
 		}
-		if p.ResetCredits != nil {
-			c := codexapi.ResetCreditsSnapshot{AvailableCount: p.ResetCredits.AvailableCount, UpdatedAt: derefTime(p.UpdatedAt)}
-			sum := SummarizeCredits(c)
-			v.ResetCredits = &c
-			v.ResetCreditSummary = &sum
-			v.ResetCreditsText, v.ResetCreditLines = creditsText(lc, nil, c, sum)
+	}
+	if p != nil && p.ResetCredits != nil && (pb == nil || pb.ResetCredits == nil) {
+		c := codexapi.ResetCreditsSnapshot{AvailableCount: p.ResetCredits.AvailableCount, UpdatedAt: derefTime(p.UpdatedAt)}
+		sum := SummarizeCredits(c)
+		v.ResetCredits = &c
+		v.ResetCreditSummary = &sum
+		v.ResetCreditsText, v.ResetCreditLines = creditsText(lc, nil, c, sum)
+	}
+	if pb != nil {
+		v.APIKeyMode, v.APIBaseURL, v.APIBalance = pb.APIKeyMode, pb.APIBaseURL, pb.APIBalance
+		if len(pb.AllDevicesTokens) > 0 {
+			v.Heatmap.AllDevices = dailyTokensMap(pb.AllDevicesTokens)
 		}
+		if len(pb.LocalTokens) > 0 {
+			v.Heatmap.Local = dailyTokensMap(pb.LocalTokens)
+		}
+		if len(pb.AllDevicesTokens) > 0 || len(pb.LocalTokens) > 0 {
+			v.Heatmap.CalculatedAt = now
+			if pb.TokensAsOf != nil {
+				v.Heatmap.OfficialStatsAsOf = estimate.UTCDay(*pb.TokensAsOf)
+			}
+			v.Heatmap.OfficialGeneratedAt = derefTime(pb.TokensGenerated)
+		}
+		if pb.Estimate != nil {
+			v.Estimate = importPanelEstimate(pb.Estimate)
+			v.EstimateError = pb.Estimate.Error
+		}
+		if c := importPanelResetCredits(pb.ResetCredits); c != nil {
+			sum := SummarizeCredits(*c)
+			v.ResetCredits, v.ResetCreditSummary = c, &sum
+			v.ResetCreditsText, v.ResetCreditLines = creditsText(lc, nil, *c, sum)
+			v.CreditDetails = CreditDetails(lc, *c)
+		}
+		v.Speed = importPanelSpeed(pb.Speed)
 	}
 	return v
 }
 
-func remoteGrokState(providers *export.StatusProviders, prefs store.Preferences, lc l10n.Localizer, now time.Time) GrokState {
+func remoteGrokState(providers *export.StatusProviders, pb *export.ProviderPanelBlock, prefs store.Preferences, lc l10n.Localizer, now time.Time) GrokState {
 	if providers == nil || providers.Grok == nil {
 		return GrokState{Availability: GrokCLIUnavailable}
 	}
@@ -332,10 +485,35 @@ func remoteGrokState(providers *export.StatusProviders, prefs store.Preferences,
 		g.Plan = *w.Plan
 	}
 	g.UpdatedAt = derefTime(w.UpdatedAt)
+	if pb == nil {
+		return g
+	}
+	g.Cost = importStatusCost(pb.Cost)
+	if len(pb.LocalTokens) > 0 {
+		g.Heatmap.Local = dailyTokensMap(pb.LocalTokens)
+		g.Heatmap.CalculatedAt = now
+	}
+	g.RecentSessions = pb.RecentSessions
+	g.Speed = importPanelSpeed(pb.Speed)
+	if c := importPanelResetCredits(pb.ResetCredits); c != nil {
+		sum := SummarizeCredits(*c)
+		g.ResetCredits, g.ResetCreditSummary = c, &sum
+	}
+	g.Billing = pb.Billing
+	g.Accounts = remoteProviderAccounts(pb.Accounts, pb.ActiveAccountID)
+	for _, q := range pb.AccountQuotas {
+		if g.AccountQuotas == nil {
+			g.AccountQuotas = map[string]GrokAccountQuota{}
+		}
+		g.AccountQuotas[q.ID] = GrokAccountQuota{
+			Plan: q.Plan, Title: remoteQuotaTitle(lc, q.Plan, q.PeriodKind), UsedPercent: q.UsedPercent,
+			ResetsAt: derefTime(q.ResetsAt), IncludedUSD: q.IncludedUSD, UpdatedAt: q.UpdatedAt,
+		}
+	}
 	return g
 }
 
-func remoteClaudeState(providers *export.StatusProviders, prefs store.Preferences, lc l10n.Localizer, now time.Time) ClaudeState {
+func remoteClaudeState(providers *export.StatusProviders, pb *export.ProviderPanelBlock, prefs store.Preferences, lc l10n.Localizer, now time.Time) ClaudeState {
 	if providers == nil || providers.Claude == nil {
 		return ClaudeState{Availability: ClaudeNotLoggedIn}
 	}
@@ -345,6 +523,34 @@ func remoteClaudeState(providers *export.StatusProviders, prefs store.Preference
 		c.Plan = *w.Plan
 	}
 	c.UpdatedAt = derefTime(w.UpdatedAt)
+	if pb == nil {
+		return c
+	}
+	c.Cost = importStatusCost(pb.Cost)
+	if len(pb.LocalTokens) > 0 {
+		c.Heatmap.Local = dailyTokensMap(pb.LocalTokens)
+		c.Heatmap.CalculatedAt = now
+	}
+	c.RecentSessions = pb.RecentSessions
+	c.Speed = importPanelSpeed(pb.Speed)
+	if r := importPanelResetCredits(pb.ResetCredits); r != nil {
+		sum := SummarizeCredits(*r)
+		c.ResetCredits, c.ResetCreditSummary = r, &sum
+	}
+	c.ExtraUsage = pb.ExtraUsage
+	if pb.API != nil {
+		c.API = &ClaudeAPIView{BaseURL: pb.API.BaseURL, Quota: pb.API.Quota, ErrorCode: pb.API.ErrorCode}
+	}
+	c.Accounts = remoteProviderAccounts(pb.Accounts, pb.ActiveAccountID)
+	for _, q := range pb.AccountQuotas {
+		if c.AccountQuotas == nil {
+			c.AccountQuotas = map[string]ClaudeAccountQuota{}
+		}
+		c.AccountQuotas[q.ID] = ClaudeAccountQuota{
+			Plan: q.Plan, Title: remoteQuotaTitle(lc, q.Plan, q.PeriodKind), UsedPercent: q.UsedPercent,
+			ResetsAt: derefTime(q.ResetsAt), ExtraUsage: q.ExtraUsage, Balance: q.Balance, UpdatedAt: q.UpdatedAt,
+		}
+	}
 	return c
 }
 
@@ -519,4 +725,150 @@ func parseSwiftDecimal(d *swiftjson.Decimal) *decimal.Decimal {
 		return nil
 	}
 	return &v
+}
+
+func dailyTokensMap(rows []export.DailyTokens) map[string]int64 {
+	tokens := map[string]int64{}
+	for _, d := range rows {
+		tokens[d.Date] = int64(d.Tokens)
+	}
+	return tokens
+}
+
+// remoteAccountsView rebuilds the Codex managed-account list from the panel
+// block; the email never travels in the file, so it stays empty.
+func remoteAccountsView(b *export.CodexPanelBlock) AccountsView {
+	v := remoteProviderAccounts(b.Accounts, b.ActiveAccountID)
+	if b.Display != nil {
+		v.Display = codex.AccountDisplay{Authenticated: b.Display.Authenticated, DisplayName: b.Display.DisplayName}
+	}
+	return v
+}
+
+func remoteProviderAccounts(accounts []export.PanelAccount, activeID string) AccountsView {
+	v := AccountsView{ActiveID: activeID}
+	for _, a := range accounts {
+		v.Sidebar = append(v.Sidebar, importPanelAccount(a))
+	}
+	slices.SortStableFunc(v.Sidebar, func(x, y codex.ManagedAccount) int {
+		return cmp.Compare(x.SortIndex, y.SortIndex)
+	})
+	return v
+}
+
+func importPanelAccount(a export.PanelAccount) codex.ManagedAccount {
+	return codex.ManagedAccount{
+		ID: a.ID, SortIndex: a.SortIndex, AuthMode: codex.AuthMode(a.AuthMode),
+		Username: a.Username, UserID: a.UserID, SubjectID: a.SubjectID, AccountID: a.AccountID,
+		WorkspaceName: a.WorkspaceName, DisplayName: a.DisplayName, Alias: a.Alias, Note: a.Note,
+		PlanType: a.PlanType, SubscriptionExpiresAt: a.SubscriptionExpiresAt, CreatedAt: a.CreatedAt,
+		LastUsedAt: a.LastUsedAt, LastQuotaAt: a.LastQuotaAt, RequiresReauth: a.RequiresReauth,
+		APIBaseURL: a.APIBaseURL, APIModel: a.APIModel, APIQuota: a.APIQuota,
+		CachedQuota: importPanelAccountQuota(a.Quota),
+	}
+}
+
+func importPanelAccountQuota(q *export.PanelAccountQuotaLine) *codex.CachedAccountQuota {
+	if q == nil {
+		return nil
+	}
+	out := &codex.CachedAccountQuota{
+		Plan: q.Plan, PrimaryUsedPercent: q.PrimaryUsedPercent, PrimaryResetsAt: q.PrimaryResetsAt,
+		PrimaryWindowMinutes: q.PrimaryWindowMinutes, SecondaryUsedPercent: q.SecondaryUsedPercent,
+		SecondaryResetsAt: q.SecondaryResetsAt, SecondaryWindowMinutes: q.SecondaryWindowMinutes,
+		UpdatedAt: q.UpdatedAt,
+	}
+	for _, m := range q.AdditionalMeters {
+		out.AdditionalMeters = append(out.AdditionalMeters, codex.CachedQuotaMeterRow{
+			ID: m.ID, WindowMinutes: m.WindowMinutes, Name: m.Name, UsedPercent: m.UsedPercent,
+		})
+	}
+	return out
+}
+
+func importPanelEstimate(e *export.PanelEstimate) *estimate.Snapshot {
+	out := &estimate.Snapshot{
+		WindowMode:       estimate.ParseWindowMode(e.WindowMode),
+		CycleStartDate:   e.CycleStartDate,
+		UsedPercent:      e.UsedPercent,
+		UsedCredits:      e.UsedCredits,
+		UsedUSD:          e.UsedUSD,
+		DayCount:         e.DayCount,
+		EstimatedCredits: e.EstimatedCredits,
+		EstimatedUSD:     e.EstimatedUSD,
+		CanExtrapolate:   e.CanExtrapolate,
+		HasWeeklyWindow:  e.HasWeeklyWindow,
+		PreviousEstimate: e.PreviousEstimate,
+		ChangePercent:    e.ChangePercent,
+		History:          e.History,
+		CalculatedAt:     e.CalculatedAt,
+	}
+	if e.ChangeKind != "" {
+		k := estimate.ChangeKind(e.ChangeKind)
+		out.ChangeKind = &k
+	}
+	if e.UnavailableReason != "" {
+		u := estimate.UnavailableReason(e.UnavailableReason)
+		out.UnavailableReason = &u
+	}
+	for _, r := range e.CurrentRows {
+		out.CurrentRows = append(out.CurrentRows, estimate.Row{
+			Date: r.Date, Credits: r.Credits, Tokens: r.Tokens, Turns: r.Turns, USD: r.USD,
+			CreditsReported: r.CreditsReported, TotalsReported: r.TotalsReported,
+		})
+	}
+	return out
+}
+
+func importPanelResetCredits(r *export.PanelResetCredits) *codexapi.ResetCreditsSnapshot {
+	if r == nil {
+		return nil
+	}
+	out := &codexapi.ResetCreditsSnapshot{AvailableCount: r.AvailableCount, UpdatedAt: r.UpdatedAt}
+	for _, c := range r.Credits {
+		out.Credits = append(out.Credits, codexapi.ResetCredit{
+			ID: c.ID, Status: c.Status, CreatedAt: c.CreatedAt, ExpiresAt: c.ExpiresAt,
+			RemainingSeconds: c.RemainingSeconds,
+		})
+	}
+	return out
+}
+
+func importPanelSpeed(r *export.PanelSpeedReport) *speed.Report {
+	if r == nil {
+		return nil
+	}
+	out := &speed.Report{NoTTFT: r.NoTTFT, Tiered: r.Tiered, From: r.From, To: r.To, CalculatedAt: r.CalculatedAt}
+	out.Groups = importPanelSpeedStats(r.Groups)
+	for _, s := range r.Sessions {
+		out.Sessions = append(out.Sessions, speed.SessionStat{
+			ID: s.ID, Title: s.Title, ProjectName: s.ProjectName, UpdatedAt: s.UpdatedAt,
+			Groups: importPanelSpeedStats(s.Groups),
+		})
+	}
+	return out
+}
+
+func importPanelSpeedStats(rows []export.PanelSpeedStat) []speed.Stat {
+	out := make([]speed.Stat, 0, len(rows))
+	for _, g := range rows {
+		out = append(out, speed.Stat{
+			Model: g.Model, Effort: g.Effort, Tier: speed.Tier(g.Tier), Calls: g.Calls,
+			TTFTP50: time.Duration(g.TTFTP50NS), TTFTP90: time.Duration(g.TTFTP90NS),
+			OutputTokens: g.OutputTokens, Decode: time.Duration(g.DecodeNS),
+		})
+	}
+	return out
+}
+
+// remoteQuotaTitle rebuilds the localized period title of an account quota
+// line from its period kind; the plan name is the fallback.
+func remoteQuotaTitle(lc l10n.Localizer, plan, periodKind string) string {
+	switch periodKind {
+	case "weekly":
+		return lc.Text(l10n.KeyGrokBillingPeriodWeekly)
+	case "monthly":
+		return lc.Text(l10n.KeyGrokBillingPeriodMonthly)
+	}
+	return plan
 }

@@ -2,13 +2,21 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/licoy/quosparr/internal/export"
+	"github.com/licoy/quosparr/internal/export/swiftjson"
+	"github.com/licoy/quosparr/internal/grok"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/remote"
 	"github.com/licoy/quosparr/internal/runway"
+	"github.com/licoy/quosparr/internal/sessions"
 	"github.com/licoy/quosparr/internal/store"
+	"github.com/licoy/quosparr/internal/usage"
 )
 
 func TestRemoteEnabled(t *testing.T) {
@@ -161,7 +169,13 @@ func TestRemoteModeGatesLocalActions(t *testing.T) {
 	}
 
 	installDetailActions(rt, &actions)
-	if actions.QueryCost != nil || actions.QueryReaction != nil || actions.RepairSessions != nil {
+	if actions.QueryCost == nil {
+		t.Fatal("remote mode dropped the read-only cost query")
+	}
+	if _, err := actions.QueryCost(context.Background(), store.ProviderGrok, CostQuery{}); err != errDetailUnavailable {
+		t.Fatalf("cost query without a remote service = %v, want %v", err, errDetailUnavailable)
+	}
+	if actions.QueryReaction != nil || actions.RepairSessions != nil {
 		t.Fatal("remote mode installed detail writers")
 	}
 	if actions.Skills.Query == nil || actions.Skills.ReadBody == nil {
@@ -179,6 +193,158 @@ func TestRemoteModeGatesLocalActions(t *testing.T) {
 		t.Error("remote mode installed account switching")
 	}
 }
+
+// staticRemoteFetcher serves one exported status snapshot.
+type staticRemoteFetcher struct {
+	data []byte
+}
+
+func (f staticRemoteFetcher) FetchStatus(context.Context) ([]byte, error) { return f.data, nil }
+
+func remoteTestStatus(t *testing.T, snap export.StatusSnapshot, now func() time.Time) *remoteRuntime {
+	t.Helper()
+	data, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := runway.RemoteOptions{Fetcher: staticRemoteFetcher{data: data}, Preferences: store.DefaultPreferences()}
+	if now != nil {
+		opts.Now = now
+	}
+	rr := &remoteRuntime{RemoteService: runway.NewRemote(opts), prefs: store.DefaultPreferences()}
+	t.Cleanup(rr.Close)
+	return rr
+}
+
+func TestRemoteDetailCostFromPanel(t *testing.T) {
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	fixed := start.Add(7 * 24 * time.Hour)
+	cost := &export.CostSummary{
+		Source: "localSessions", Confidence: "priced",
+		Window:    export.Interval{Start: start, Duration: 7 * 24 * 3600},
+		ModelRows: []export.CostBreakdownRow{{Name: "grok-4"}},
+	}
+	for i := 0; i < 7; i++ {
+		cost.DailyRows = append(cost.DailyRows, export.CostDailyRow{
+			Date:         start.AddDate(0, 0, i).Format("2006-01-02"),
+			Totals:       sessions.Totals{TotalTokens: 10},
+			EstimatedUSD: swiftjsonPtr(strconv.Itoa(i + 1)),
+		})
+	}
+	rr := remoteTestStatus(t, export.StatusSnapshot{Panel: &export.StatusPanel{Grok: &export.ProviderPanelBlock{Cost: cost}}}, func() time.Time { return fixed })
+	rt := &liveApp{remoteSvc: rr}
+	<-rr.RemoteService.Refresh()
+
+	ctx := context.Background()
+	custom := &usage.CostRange{Window: usage.Window{Start: start.AddDate(0, 0, 1), End: start.AddDate(0, 0, 3)}}
+	sum, err := rt.queryRemoteDetailCost(ctx, store.ProviderGrok, CostQuery{Custom: custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sum.DailyRows) != 2 || sum.DailyRows[0].Date != "2026-10-02" || sum.DailyRows[1].Date != "2026-10-03" {
+		t.Fatalf("daily rows = %+v", sum.DailyRows)
+	}
+	if sum.Totals.TotalTokens != 20 {
+		t.Errorf("totals = %+v", sum.Totals)
+	}
+	if sum.EstimatedUSD == nil || sum.EstimatedUSD.String() != "5" {
+		t.Errorf("estimated usd = %v", sum.EstimatedUSD)
+	}
+	if len(sum.ModelRows) != 0 {
+		t.Errorf("partial window copied breakdown rows: %+v", sum.ModelRows)
+	}
+	if sum.Source != usage.SourceLocalSessions || sum.Confidence != usage.ConfidencePriced {
+		t.Errorf("source/confidence = %v/%v", sum.Source, sum.Confidence)
+	}
+
+	// The exported window keeps the breakdown rows.
+	sum, err = rt.queryRemoteDetailCost(ctx, store.ProviderGrok, CostQuery{Range: store.CostRangeCurrent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sum.DailyRows) != 7 || len(sum.ModelRows) != 1 {
+		t.Fatalf("current cycle rows = %d/%d", len(sum.DailyRows), len(sum.ModelRows))
+	}
+	if !sum.Window.Start.Equal(start) {
+		t.Errorf("window start = %v, want %v", sum.Window.Start, start)
+	}
+
+	// A provider without a cost mirror stays unavailable.
+	if _, err := rt.queryRemoteDetailCost(ctx, store.ProviderClaude, CostQuery{Custom: custom}); err != errDetailUnavailable {
+		t.Errorf("claude cost error = %v, want %v", err, errDetailUnavailable)
+	}
+}
+
+func TestRemoteRuntimeForwardsPreferences(t *testing.T) {
+	rr := remoteTestStatus(t, export.StatusSnapshot{}, nil)
+	<-rr.RemoteService.Refresh()
+	p := rr.Preferences()
+	if p.SelectedProvider == store.ProviderGrok {
+		p.SelectedProvider = store.ProviderClaude
+	} else {
+		p.SelectedProvider = store.ProviderGrok
+	}
+	rr.SetPreferences(p)
+	if rr.Preferences().SelectedProvider != p.SelectedProvider {
+		t.Fatal("SetPreferences did not store the app-side copy")
+	}
+	<-rr.RemoteService.Refresh()
+	if got := rr.Snapshot().Provider; got != p.SelectedProvider {
+		t.Fatalf("snapshot provider = %v, want %v (preferences not forwarded)", got, p.SelectedProvider)
+	}
+}
+
+func TestRebuildRemoteSnapshotDetail(t *testing.T) {
+	var snap runway.Snapshot
+	if got := rebuildRemoteSnapshotDetail(snap, export.StatusSnapshot{}); got.Grok.Detail != nil {
+		t.Error("empty status produced a grok detail")
+	}
+	billing := &export.PanelGrokBilling{Plan: ptrString("super"), Source: "current"}
+	raw := export.StatusSnapshot{Panel: &export.StatusPanel{Grok: &export.ProviderPanelBlock{Billing: billing}}}
+	detail, ok := rebuildRemoteSnapshotDetail(snap, raw).Grok.Detail.(*grok.BillingSnapshot)
+	if !ok || detail == nil {
+		t.Fatalf("detail = %#v", rebuildRemoteSnapshotDetail(snap, raw).Grok.Detail)
+	}
+	if detail.Plan == nil || *detail.Plan != "super" || detail.Source != grok.BillingSourceCurrent {
+		t.Errorf("detail = %+v", detail)
+	}
+}
+
+func TestGrokBillingPanelRoundTrip(t *testing.T) {
+	start := time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)
+	reset := time.Date(2026, 9, 8, 9, 0, 0, 0, time.UTC)
+	limit, used := int64(2500), int64(1250)
+	onDemand, unified := true, false
+	tokenEnd := start.Add(72 * time.Hour)
+	orig := grok.BillingSnapshot{
+		Plan:                 ptrString("SuperGrok"),
+		IncludedUsagePercent: 42.5,
+		Period:               &grok.BillingPeriod{Kind: grok.BillingWeekly, StartsAt: &start, ResetsAt: &reset},
+		IncludedLimitCents:   &limit,
+		IncludedUsedCents:    &used,
+		PrepaidBalanceCents:  &limit,
+		OnDemandEnabled:      &onDemand,
+		OnDemandUsedCents:    &used,
+		OnDemandLimitCents:   &limit,
+		ProductUsage:         []grok.BillingProductUsage{{Product: "GrokBuild", UsagePercent: 30}, {Product: "GrokChat", UsagePercent: 12.5}},
+		IsUnifiedBillingUser: &unified,
+		ResetCredits: &grok.ResetCreditSnapshot{
+			AvailableCount: 1,
+			Tokens:         []grok.ResetCreditToken{{TokenID: "tok", ValidityStart: &start, ValidityEnd: &tokenEnd}},
+			UpdatedAt:      start,
+		},
+		Source:    grok.BillingSourceCurrent,
+		UpdatedAt: start,
+	}
+	back := grokBillingFromPanel(grokBillingToPanel(&orig))
+	if !reflect.DeepEqual(*back, orig) {
+		t.Fatalf("round trip mismatch:\n got %+v\nwant %+v", *back, orig)
+	}
+}
+
+func swiftjsonPtr(s string) *swiftjson.Decimal { d := swiftjson.MustDecimal(s); return &d }
+
+func ptrString(s string) *string { return &s }
 
 func TestRemoteRuntimePreferenceBridge(t *testing.T) {
 	rr := &remoteRuntime{prefs: store.DefaultPreferences()}

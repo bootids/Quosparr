@@ -51,8 +51,11 @@ type GrokState struct {
 	LastError  string
 	Refreshing bool
 	// Widget is the ready-made widget provider block, nil when Grok is unused.
-	Widget         *export.ProviderSnapshot
-	Detail         any
+	Widget *export.ProviderSnapshot
+	Detail any
+	// Billing is the export mirror of the billing-details payload of Detail,
+	// filled by the application adapter; it carries no credentials.
+	Billing        *export.PanelGrokBilling
 	Cost           *usage.Summary
 	Heatmap        HeatmapData
 	RecentSessions []sessions.Item

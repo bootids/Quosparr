@@ -103,7 +103,9 @@ func (s *Service) statusSnapshotLocked(now time.Time) export.StatusSnapshot {
 	}
 	items := append([]sessions.Item{}, s.recent...)
 	out.Sessions = &sessions.Summary{Items: items}
-	out.Providers = statusExportProviders(s.buildLocked(now))
+	built := s.buildLocked(now)
+	out.Providers = statusExportProviders(built)
+	out.Panel = statusExportPanel(built)
 	return out
 }
 
