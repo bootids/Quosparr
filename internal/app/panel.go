@@ -76,8 +76,13 @@ func (a *App) panelMainPage(c *ui.Context, l l10n.Localizer, prefs store.Prefere
 }
 
 // panelStatusLines shows the operation message and the last error of the
-// selected provider above the footer.
+// selected provider above the footer. A quota-only tab has no message of its
+// own (its failures render inside the quota section), so locally it shows
+// nothing; remote mode keeps the lines because they carry the pull error.
 func panelStatusLines(c *ui.Context, l l10n.Localizer, prefs store.Preferences, snap runway.Snapshot) {
+	if quotaOnlyProvider(prefs.SelectedProvider) && !remoteEnabled(prefs) {
+		return
+	}
 	message, failure := snap.Accounts.Message, snap.Codex.LastError
 	switch prefs.SelectedProvider {
 	case store.ProviderGrok:

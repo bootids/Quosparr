@@ -178,6 +178,7 @@ type liveApp struct {
 	claudeB        *claudeBridge
 	zaiStore       *zai.Store
 	zaiMod         *meterModule
+	meterMods      map[store.Provider]*meterModule
 	reset          *resetBridge
 	repo           *usage.Repository
 	widgets        *widgetCoordinator
@@ -185,6 +186,7 @@ type liveApp struct {
 	widgetDispatch *snapshotDispatch
 	alertDispatch  *alertDispatch
 	version        string
+	home           string
 	langs          []string
 }
 
@@ -235,8 +237,8 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		log.Println("claude accounts: load failed")
 	}
 	cbridge.reload(false)
-	meters, zstore, zmod := newMeterModules(home, prefs, langs)
 	reset := newResetBridge(opts.Settings, prefs, langs)
+	meters, mods, zstore, zmod := newMeterModules(home, prefs, langs)
 	repo := openUsage(home)
 	widgetRequirements := initialWidgetRequirements(opts.Settings)
 	widgets := newWidgetCoordinator(home, widgetRequirements != 0)
@@ -284,8 +286,8 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		SystemLanguages: langs,
 	})
 	rt := &liveApp{
-		svc: svc, localSvc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset, zaiStore: zstore, zaiMod: zmod,
-		repo: repo, widgets: widgets, dispatch: dispatch, widgetDispatch: widgetUI, alertDispatch: alertUI, version: opts.Version, langs: langs,
+		svc: svc, localSvc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset, zaiStore: zstore, zaiMod: zmod, meterMods: mods,
+		repo: repo, widgets: widgets, dispatch: dispatch, widgetDispatch: widgetUI, alertDispatch: alertUI, version: opts.Version, home: home, langs: langs,
 	}
 	widgets.onRequirements = svc.SetWidgetRequirements
 	widgets.onError = svc.ReportWidgetError

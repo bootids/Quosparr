@@ -170,8 +170,11 @@ func TestFetchSuccess(t *testing.T) {
 	if w.WindowMinutes != meter.WeeklyMinutes {
 		t.Errorf("weekly WindowMinutes = %d, want %d", w.WindowMinutes, meter.WeeklyMinutes)
 	}
-	if w.Unit != "percent" || w.Title != w.ID {
+	if w.Unit != "percent" || w.Title != "Weekly Limit Remaining" {
 		t.Errorf("unit/title = %q/%q", w.Unit, w.Title)
+	}
+	if w.Group != "Gemini Models" || w.GroupDescription != "Synthetic Gemini group" {
+		t.Errorf("group = %q/%q", w.Group, w.GroupDescription)
 	}
 	// (1 - 0.9925113320350647) * 100
 	if !w.HasPercent || math.Abs(w.Percent-0.7488667964935298) > 1e-9 {
@@ -183,11 +186,21 @@ func TestFetchSuccess(t *testing.T) {
 	if !w.HasReset || w.ResetsAt != time.Date(2026, 8, 21, 22, 8, 38, 0, time.UTC) {
 		t.Errorf("weekly reset = %v has=%v", w.ResetsAt, w.HasReset)
 	}
-	if h := byID["gemini-5h"]; h.WindowMinutes != meter.FiveHourMinutes {
-		t.Errorf("5h WindowMinutes = %d", h.WindowMinutes)
+	if h := byID["gemini-5h"]; h.WindowMinutes != meter.FiveHourMinutes || h.Title != "Five Hour Limit Remaining" {
+		t.Errorf("5h window/title = %d/%q", h.WindowMinutes, h.Title)
 	}
 	if p := byID["3p-5h"]; !p.HasPercent || p.Percent != 0 {
 		t.Errorf("3p-5h percent = %v has=%v", p.Percent, p.HasPercent)
+	}
+	// Full pools drop the reset: the official panel shows "Quota available"
+	// instead of a countdown.
+	for _, id := range []string{"3p-weekly", "3p-5h"} {
+		if p := byID[id]; p.HasPercent && p.Percent <= 0 && p.HasReset {
+			t.Errorf("%s full pool kept its reset", id)
+		}
+		if p := byID[id]; p.Group != "Claude and GPT models" {
+			t.Errorf("%s group = %q", id, p.Group)
+		}
 	}
 }
 

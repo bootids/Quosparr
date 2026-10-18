@@ -621,11 +621,23 @@ func remoteMeterStates(panel *export.StatusPanel, prefs store.Preferences, lc l1
 		if out == nil {
 			out = map[store.Provider]MeterState{}
 		}
-		out[p] = MeterState{
+		ms := MeterState{
 			Availability: remoteMeterAvailability(b.Availability), Plan: b.Plan,
 			Meters: widgetMeters(lc, b.Meters, prefs, now), Detail: remoteDetailLines(b.Detail),
 			FetchedAt: derefTime(b.FetchedAt),
 		}
+		for _, r := range b.Rates {
+			ms.Rates = append(ms.Rates, MeterRate{
+				ID: r.ID, Title: r.Title, Unit: r.Unit, IsPercent: r.IsPercent,
+				PerHour: r.PerHour, HasRate: r.HasRate, Samples: r.Samples,
+				From: r.From, To: r.To,
+				ExhaustsAt: r.ExhaustsAt, HasExhaust: r.HasExhaust,
+				ResetsAt: r.ResetsAt, HasReset: r.HasReset,
+				AtReset: r.AtReset, HasAtReset: r.HasAtReset,
+			})
+		}
+		ms.Speed = importPanelSpeed(b.Speed)
+		out[p] = ms
 	}
 	return out
 }
@@ -707,6 +719,15 @@ func widgetMeters(lc l10n.Localizer, quota []export.WidgetQuota, prefs store.Pre
 		if q.ValueText != nil {
 			m.ValueText = *q.ValueText
 			m.Balance = true
+		}
+		if q.Group != nil {
+			m.Group = *q.Group
+		}
+		if q.GroupDescription != nil {
+			m.GroupDescription = *q.GroupDescription
+		}
+		if q.RemainingCaption != nil {
+			m.RemainingCaption = *q.RemainingCaption
 		}
 		meters = append(meters, m)
 	}

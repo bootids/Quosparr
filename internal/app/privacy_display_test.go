@@ -83,6 +83,11 @@ func TestAccountsProviderHeaderHasNoOuterTrackOrPrivacyControl(t *testing.T) {
 
 func TestDisplayPrivacySwitchUpdatesBothProviderPanels(t *testing.T) {
 	for _, provider := range store.Providers() {
+		if quotaOnlyProvider(provider) {
+			// The quota-only tabs have no identity row, so there is no panel
+			// identity for the privacy switch to mask.
+			continue
+		}
 		snap := panelFixture()
 		snap.Grok.Accounts = snap.Accounts
 		snap.Grok.Accounts.Display.DisplayName = "Ada Lovelace"

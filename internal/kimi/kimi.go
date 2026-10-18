@@ -110,7 +110,12 @@ func fetchStatus(err error) meter.Status {
 	return meter.StatusParse
 }
 
-// normalize turns the usage response into limit rows.
+// normalize turns the usage response into limit rows, keeping only the 5h
+// and 7d windows: at most one pool per window survives. Monthly pools,
+// unknown windows and duplicate representations of a kept window are
+// dropped. When several candidates share a window the one with percent data
+// wins, then the limits[] entry, then the usage block, then the usages
+// entry; encounter order breaks remaining ties. Output order is 5h, 7d.
 func normalize(body []byte) ([]meter.Limit, error) {
 	var root map[string]json.RawMessage
 	if err := json.Unmarshal(body, &root); err != nil {
@@ -122,12 +127,11 @@ func normalize(body []byte) ([]meter.Limit, error) {
 	if !hasUsage && !hasLimits && !hasUsages {
 		return nil, fmt.Errorf("kimi: usage response has no usage, limits or usages")
 	}
-	ids := make(map[string]int)
-	var limits []meter.Limit
+	var candidates []poolCandidate
 	if raw, ok := root["usage"]; ok {
 		var usage countsPayload
 		if err := json.Unmarshal(raw, &usage); err == nil {
-			limits = append(limits, uniqueID(countsLimit("7d", meter.WeeklyMinutes, usage), ids))
+			candidates = append(candidates, poolCandidate{limit: countsLimit("7d", meter.WeeklyMinutes, usage), rank: rankUsageBlock})
 		}
 	}
 	if raw, ok := root["limits"]; ok {
@@ -140,7 +144,7 @@ func normalize(body []byte) ([]meter.Limit, error) {
 			if err != nil {
 				return nil, err
 			}
-			limits = append(limits, uniqueID(l, ids))
+			candidates = append(candidates, poolCandidate{limit: l, rank: rankLimitsEntry})
 		}
 	}
 	if raw, ok := root["usages"]; ok {
@@ -149,16 +153,52 @@ func normalize(body []byte) ([]meter.Limit, error) {
 			return nil, err
 		}
 		for _, pair := range pairs {
-			limits = append(limits, uniqueID(ratioLimit(pair.key, pair.value), ids))
+			candidates = append(candidates, poolCandidate{limit: ratioLimit(pair.key, pair.value), rank: rankUsagesEntry})
+		}
+	}
+	var limits []meter.Limit
+	for _, minutes := range []int{meter.FiveHourMinutes, meter.WeeklyMinutes} {
+		best := -1
+		for i, c := range candidates {
+			if c.limit.WindowMinutes != minutes {
+				continue
+			}
+			if best < 0 || poolPreferred(c, candidates[best]) {
+				best = i
+			}
+		}
+		if best >= 0 {
+			limits = append(limits, candidates[best].limit)
 		}
 	}
 	return limits, nil
 }
 
+// pool ranking: lower rank wins when percent presence ties.
+const (
+	rankLimitsEntry = iota
+	rankUsageBlock
+	rankUsagesEntry
+)
+
+// poolCandidate is one candidate row for a 5h/7d window slot.
+type poolCandidate struct {
+	limit meter.Limit
+	rank  int
+}
+
+// poolPreferred reports whether a beats b for the same window.
+func poolPreferred(a, b poolCandidate) bool {
+	if a.limit.HasPercent != b.limit.HasPercent {
+		return a.limit.HasPercent
+	}
+	return a.rank < b.rank
+}
+
 // countsLimit builds a counts row (the 7d usage object or a limits[] detail).
 func countsLimit(id string, windowMinutes int, p countsPayload) meter.Limit {
 	l := meter.Limit{
-		ID: id, Unit: "unknown", WindowMinutes: windowMinutes,
+		ID: id, Unit: "", WindowMinutes: windowMinutes,
 		Used: meter.NaN(), LimitValue: meter.NaN(), Remaining: meter.NaN(), Percent: meter.NaN(),
 	}
 	if p.Limit.ok {
@@ -259,15 +299,6 @@ func ratioPairs(raw json.RawMessage) ([]ratioPair, error) {
 		pairs = append(pairs, ratioPair{key: key, value: value})
 	}
 	return pairs, nil
-}
-
-// uniqueID suffixes duplicate IDs with #2, #3, ... in encounter order.
-func uniqueID(l meter.Limit, ids map[string]int) meter.Limit {
-	ids[l.ID]++
-	if n := ids[l.ID]; n > 1 {
-		l.ID = fmt.Sprintf("%s#%d", l.ID, n)
-	}
-	return l
 }
 
 // parseReset parses an RFC3339 reset timestamp into UTC.

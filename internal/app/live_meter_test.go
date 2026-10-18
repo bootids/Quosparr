@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"math"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/meter"
 	"github.com/licoy/quosparr/internal/runway"
+	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
 )
 
@@ -99,7 +102,7 @@ func TestMeterValueTextFormats(t *testing.T) {
 	}{
 		{meter.Limit{Unit: "usd", Used: 12, LimitValue: 200}, "$12 / $200"},
 		{meter.Limit{Unit: "usd", Used: 12.5, LimitValue: 200}, "$12.5 / $200"},
-		{meter.Limit{Unit: "usd", Used: 1.0 / 3.0, LimitValue: math.NaN()}, "$0.3333333333333333"},
+		{meter.Limit{Unit: "usd", Used: 1.0 / 3.0, LimitValue: math.NaN()}, "$0.33"},
 		{meter.Limit{Unit: "tokens", Used: 1234, LimitValue: 5000}, "1234 / 5000"},
 		{meter.Limit{Unit: "percent", Percent: 40, HasPercent: true, Used: math.NaN(), LimitValue: math.NaN()}, ""},
 		{meter.Limit{Unit: "tokens", Used: math.NaN()}, ""},
@@ -135,35 +138,21 @@ func TestMeterLimitMetersCarryValueText(t *testing.T) {
 	}
 }
 
-func TestMeterUsageLines(t *testing.T) {
-	lines := meterUsageLines(&meter.Usage{
-		TotalCalls:  8,
-		TotalTokens: 826662212,
-		Models:      []meter.UsageModel{{Name: "GLM-5.3", Tokens: 826662212}},
-		Features:    []meter.UsageFeature{{ID: "codePlan", Used: 8}},
-	})
-	wants := []string{"GLM-5.3: 826662212", "calls: 8", "tokens: 826662212", "codePlan: 8"}
-	if len(lines) != len(wants) {
-		t.Fatalf("lines = %+v", lines)
-	}
-	for i, w := range wants {
-		if lines[i].Value != w {
-			t.Errorf("line %d = %q, want %q", i, lines[i].Value, w)
-		}
-	}
-}
-
-func TestMeterModuleLabelPrependsDetail(t *testing.T) {
+// The zai tab no longer renders usage-summary or account-label detail rows:
+// a ready state with usage data must carry no detail lines.
+func TestMeterStateOmitsUsageDetail(t *testing.T) {
 	mod := newMeterModule(enLocalizer(), func(context.Context) meter.State {
-		return meter.State{Status: meter.StatusOK}
+		return meter.State{Status: meter.StatusOK, Usage: &meter.Usage{
+			TotalCalls:  8,
+			TotalTokens: 826662212,
+			Models:      []meter.UsageModel{{Name: "GLM-5.3", Tokens: 826662212}},
+		}}
 	}, nil)
-	mod.label = func() string { return "Team key" }
 	if err := mod.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	st := mod.State(time.Now())
-	if len(st.Detail) != 1 || st.Detail[0].Value != "Team key" {
-		t.Fatalf("detail = %+v", st.Detail)
+	if st := mod.State(time.Now()); len(st.Detail) != 0 {
+		t.Fatalf("detail = %+v, want none", st.Detail)
 	}
 }
 
@@ -172,5 +161,90 @@ func TestSelectableProvidersReturnsAllSeven(t *testing.T) {
 	want := store.Providers()
 	if !slices.Equal(got, want) || len(got) != 7 {
 		t.Fatalf("selectableProviders() = %v", got)
+	}
+}
+
+func TestMeterModuleSpeedScanFlowsIntoState(t *testing.T) {
+	now := time.Now()
+	report := speed.Report{
+		Groups:       []speed.Stat{{Model: "kimi-k2", Calls: 3, TTFTP50: 800 * time.Millisecond}},
+		From:         now.Add(-time.Hour),
+		To:           now,
+		CalculatedAt: now,
+	}
+	mod := newMeterModule(enLocalizer(), func(context.Context) meter.State {
+		return meter.State{Status: meter.StatusOK, Plan: "Pro"}
+	}, nil)
+	mod.speedScan = func(context.Context, time.Time) (speed.Report, error) {
+		return report, nil
+	}
+	if err := mod.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	st := mod.State(now)
+	if st.Speed == nil || st.SpeedError != "" {
+		t.Fatalf("speed = %+v error = %q", st.Speed, st.SpeedError)
+	}
+	if st.Speed.Groups[0].Model != "kimi-k2" || st.Speed.Groups[0].TTFTP50 != 800*time.Millisecond {
+		t.Fatalf("speed group = %+v", st.Speed.Groups)
+	}
+
+	// A failing scan replaces the report with a sanitized error.
+	boom := errors.New("stats database is locked")
+	mod.speedScan = func(context.Context, time.Time) (speed.Report, error) {
+		return speed.Report{}, boom
+	}
+	if err := mod.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if st := mod.State(now); st.Speed != nil || st.SpeedError != boom.Error() {
+		t.Fatalf("failed scan speed = %+v error = %q", st.Speed, st.SpeedError)
+	}
+
+	// A module without a speedScan (cursor, agy) reports neither.
+	plain := newMeterModule(enLocalizer(), func(context.Context) meter.State {
+		return meter.State{Status: meter.StatusOK}
+	}, nil)
+	if err := plain.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if st := plain.State(now); st.Speed != nil || st.SpeedError != "" {
+		t.Fatalf("speedless module speed = %+v error = %q", st.Speed, st.SpeedError)
+	}
+}
+
+func TestMeterModuleFiltersStaleHistoryRates(t *testing.T) {
+	hist := meter.LoadHistory(filepath.Join(t.TempDir(), "meter-history.json"))
+	mod := newMeterModule(enLocalizer(), func(context.Context) meter.State {
+		return meter.State{Status: meter.StatusOK, Limits: []meter.Limit{
+			{ID: "5h", Title: "5h", Used: 20, LimitValue: 100},
+			{ID: "7d", Title: "7d", Used: 30, LimitValue: 100},
+		}}
+	}, nil)
+	mod.provider = store.ProviderKimi
+	mod.history = hist
+
+	// Seed history with a pool (limit_month) that the current state no longer
+	// exposes; its leftover rate must not surface as a rendered row.
+	base := time.Now().Add(-time.Hour)
+	if err := hist.Record(string(store.ProviderKimi), meter.State{Status: meter.StatusOK, Limits: []meter.Limit{
+		{ID: "5h", Title: "5h", Used: 10, LimitValue: 100},
+		{ID: "7d", Title: "7d", Used: 20, LimitValue: 100},
+		{ID: "limit_month", Title: "limit_month", Used: 5, LimitValue: 100},
+	}}, base); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := mod.Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	st := mod.State(time.Now())
+	ids := make(map[string]bool, len(st.Rates))
+	for _, r := range st.Rates {
+		ids[r.ID] = true
+	}
+	if len(st.Rates) != 2 || !ids["5h"] || !ids["7d"] || ids["limit_month"] {
+		t.Fatalf("rates = %+v", st.Rates)
 	}
 }

@@ -26,6 +26,15 @@ func widgetQuota(m Meter) export.WidgetQuota {
 		v := m.ValueText
 		q.ValueText = &v
 	}
+	if m.Group != "" {
+		q.Group = &m.Group
+	}
+	if m.GroupDescription != "" {
+		q.GroupDescription = &m.GroupDescription
+	}
+	if m.RemainingCaption != "" {
+		q.RemainingCaption = &m.RemainingCaption
+	}
 	return q
 }
 

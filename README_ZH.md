@@ -8,7 +8,7 @@
 
 <sub><i>名称取自 <b>Quo</b>ta（额度）+ <b>Sparr</b>ow（麻雀）</i></sub>
 
-一只停在菜单栏里的小麻雀，替你守着 Codex、Claude 与 Grok 的额度，并为 Cursor、Kimi、Z.ai 与 Antigravity 提供只读额度表。
+一只停在菜单栏里的小麻雀，替你守着 Codex、Claude 与 Grok 的额度，并为 Cursor、Kimi、Z.ai 与 Antigravity 提供额度表。
 
 Quosparr 是面向 macOS、Windows、Linux 的原生菜单栏 / 系统托盘应用，展示 Codex、Claude Code 与 Grok 订阅额度、reset credits、API 等价成本与本机会话，三个供应商各自独立管理账号。
 
@@ -42,9 +42,9 @@ Quosparr 是面向 macOS、Windows、Linux 的原生菜单栏 / 系统托盘应�
 
 **额度表**
 
-- Cursor：从本地编辑器状态读取订阅用量摘要（只读）：套餐、总体、按需与团队额度池的美元金额，以及账单重置日期。
-- Kimi Code：从本地 Kimi CLI 凭据或 KIMI_CODE_API_KEY 读取每周额度池与限流窗口；只读。
-- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的账号库中（intl/cn 区域），显示 token/credit/tool 额度池与近 7 天模型用量摘要；Antigravity：通过本地 `agy` CLI 查看各额度池的剩余量。四者均可在面板、状态栏与悬浮窗中选择；凭据不会离开本机，只会发往各供应商自己的接口。
+- Cursor：从本地编辑器状态读取订阅用量摘要（只读）：套餐、总体、按需与团队额度池的美元金额，以及账单重置日期；也可以在 Quosparr 自己的账号库中显式保存访问令牌，优先于本地发现，令牌不会被记录。
+- Kimi Code：从本地 Kimi CLI 凭据或 KIMI_CODE_API_KEY 读取 5 小时与每周额度池及各自重置时间与限流窗口；只读。也可以把 API Key 保存到 Quosparr 的账号库，优先级：已保存的 Key > KIMI_CODE_API_KEY > 本地 CLI 凭据文件。
+- Z.ai Coding Plan：API Key 只保存在 Quosparr 自己的账号库中（intl/cn 区域），显示 5 小时与每周的 token/credit 额度池及各自重置时间与近 7 天模型用量摘要，第一个添加的账号会自动设为当前账号；Antigravity：通过本地 `agy` CLI 查看各额度池的剩余量，可在设置中选填 CLI 可执行文件路径与配置目录覆盖。四者均可在面板、状态栏与悬浮窗中选择；凭据不会离开本机，只会发往各供应商自己的接口。四个标签页还提供消耗速率分析（各额度池的消耗速度及耗尽/重置时间预估），由本地用量样本计算得出，样本仅含数字与时间戳、不含任何凭据，并同样镜像到远端只读视图。Kimi 与 Z.ai 标签页还提供 Token 速度分析（各模型首字时间与 tokens/s，含调用次数），由本机 oh-my-pi 统计只读计算，仅读取数值用量列、不涉及消息内容或凭据；Cursor 与 Antigravity 本地无 token 记录，不显示该模块。
 
 **三个供应商通用**
 

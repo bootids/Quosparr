@@ -28,15 +28,41 @@ type StatusPanel struct {
 
 // MeterPanelBlock mirrors a quota-only provider for the remote panel: the
 // availability, the plan, the same quota rows the widget snapshot carries,
-// the detail lines and the last fetch time. Error is the already-redacted
-// user-facing failure text, empty when the last fetch succeeded.
+// the detail lines, the per-pool rate analysis and the last fetch time.
+// Error is the already-redacted user-facing failure text, empty when the
+// last fetch succeeded. Rates is optional: files from older producers
+// decode without it (schema stays 1).
 type MeterPanelBlock struct {
 	Availability string            `json:"availability"`
 	Plan         string            `json:"plan,omitempty"`
 	Meters       []WidgetQuota     `json:"meters,omitempty"`
 	Detail       []PanelDetailLine `json:"detail,omitempty"`
+	Rates        []MeterPanelRate  `json:"rates,omitempty"`
+	Speed        *PanelSpeedReport `json:"speed,omitempty"`
 	FetchedAt    *time.Time        `json:"fetchedAt,omitempty"`
 	Error        string            `json:"error,omitempty"`
+}
+
+// MeterPanelRate mirrors one pool's consumption-rate analysis (the runway
+// MeterRate). Times marshal as RFC3339 like every other panel timestamp and
+// are zero when their Has* flag is false. Derived numbers and plain titles
+// only, never credentials.
+type MeterPanelRate struct {
+	ID         string    `json:"id"`
+	Title      string    `json:"title,omitempty"`
+	Unit       string    `json:"unit,omitempty"`
+	IsPercent  bool      `json:"isPercent,omitempty"`
+	PerHour    float64   `json:"perHour,omitempty"`
+	HasRate    bool      `json:"hasRate,omitempty"`
+	Samples    int       `json:"samples,omitempty"`
+	From       time.Time `json:"from,omitempty"`
+	To         time.Time `json:"to,omitempty"`
+	ExhaustsAt time.Time `json:"exhaustsAt,omitempty"`
+	HasExhaust bool      `json:"hasExhaust,omitempty"`
+	ResetsAt   time.Time `json:"resetsAt,omitempty"`
+	HasReset   bool      `json:"hasReset,omitempty"`
+	AtReset    float64   `json:"atReset,omitempty"`
+	HasAtReset bool      `json:"hasAtReset,omitempty"`
 }
 
 // PanelDetailLine is one "title: value" row of a remote panel section.

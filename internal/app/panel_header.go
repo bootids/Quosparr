@@ -34,6 +34,12 @@ func panelHeader(c *ui.Context, a *App, l l10n.Localizer, prefs store.Preference
 		if providers := prefs.PanelSelection(); len(providers) > 1 {
 			providerStrip(c, a, l, snap, providers, prefs.SelectedProvider, acts.SelectProvider)
 		}
+		if quotaOnlyProvider(prefs.SelectedProvider) {
+			// The quota-only providers have no managed login of their own;
+			// the Codex identity and its subscription badge would not follow
+			// the tab, so the header stops at the provider strip.
+			return
+		}
 		if grokView {
 			grokIdentityRow(c, a, l, prefs, snap)
 			return

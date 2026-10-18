@@ -97,18 +97,13 @@ func TestFetchTokensAndTools(t *testing.T) {
 	if st.Plan != "pro" {
 		t.Fatalf("plan = %q, want pro", st.Plan)
 	}
-	if len(st.Limits) != 3 {
-		t.Fatalf("limits = %d, want 3", len(st.Limits))
+	if len(st.Limits) != 2 {
+		t.Fatalf("limits = %d, want 2 (monthly dropped)", len(st.Limits))
 	}
-	monthly := findLimit(t, st, "tools_monthly")
-	if monthly.Unit != "requests" || monthly.WindowMinutes != meter.MonthlyMinutes {
-		t.Fatalf("tools_monthly = %+v", monthly)
-	}
-	if !monthly.HasReset || monthly.ResetsAt.UnixMilli() != 1784547608994 {
-		t.Fatalf("tools_monthly reset = %v (%v)", monthly.ResetsAt, monthly.HasReset)
-	}
-	if monthly.Used != 0 || monthly.LimitValue != 100 || monthly.Remaining != 100 {
-		t.Fatalf("tools_monthly counts = %+v", monthly)
+	for _, l := range st.Limits {
+		if l.ID == "tools_monthly" {
+			t.Fatalf("tools_monthly survived the filter: %+v", st.Limits)
+		}
 	}
 	h5 := findLimit(t, st, "tokens_5h")
 	if h5.WindowMinutes != meter.FiveHourMinutes || h5.Percent != 82 || !h5.HasPercent {
@@ -158,6 +153,69 @@ func TestFetchBusinessFailureIsAPI(t *testing.T) {
 	}
 	if st.Message == "" || st.Limits != nil {
 		t.Fatalf("state = %+v", st)
+	}
+}
+
+// TestFetchKeepsOnly5hAnd7dWindows feeds every pool family plus monthly and
+// expects only the *_5h/*_7d rows to survive.
+func TestFetchKeepsOnly5hAnd7dWindows(t *testing.T) {
+	body := `{
+		"success": true,
+		"data": {
+			"level": "pro",
+			"limits": [
+				{"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 82},
+				{"type": "TOKENS_LIMIT", "unit": 6, "number": 7, "percentage": 38},
+				{"type": "CREDIT_LIMIT", "unit": 3, "number": 5, "usage": 12000, "currentValue": 1438, "remaining": 10561, "percentage": 11},
+				{"type": "CREDIT_LIMIT", "unit": 6, "number": 1, "usage": 60000, "currentValue": 2254, "remaining": 57745, "percentage": 3},
+				{"type": "TIME_LIMIT", "unit": 5, "number": 1, "usage": 100, "currentValue": 0, "remaining": 100},
+				{"type": "TOKENS_LIMIT", "unit": 4, "number": 30, "percentage": 5}
+			]
+		}
+	}`
+	_, rw := newZaiServer(t, body, "", "", "")
+	st := Fetch(context.Background(), rw, "sk-test-key-1234", "intl", "raw", testNow)
+	if st.Status != meter.StatusOK {
+		t.Fatalf("status = %q (%s), want ok", st.Status, st.Message)
+	}
+	want := map[string]bool{"tokens_5h": false, "tokens_7d": false, "credits_5h": false, "credits_7d": false}
+	if len(st.Limits) != len(want) {
+		t.Fatalf("limits = %+v, want exactly %d pools", st.Limits, len(want))
+	}
+	for _, l := range st.Limits {
+		seen, ok := want[l.ID]
+		if !ok || seen {
+			t.Fatalf("unexpected or duplicate pool %q in %+v", l.ID, st.Limits)
+		}
+		want[l.ID] = true
+		if l.WindowMinutes != meter.FiveHourMinutes && l.WindowMinutes != meter.WeeklyMinutes {
+			t.Fatalf("pool %q window %d survived the filter", l.ID, l.WindowMinutes)
+		}
+	}
+	for id, seen := range want {
+		if !seen {
+			t.Fatalf("pool %q missing from %+v", id, st.Limits)
+		}
+	}
+}
+
+// TestFetchSingleWindow expects a lone 5h pool to pass through alone.
+func TestFetchSingleWindow(t *testing.T) {
+	body := `{
+		"success": true,
+		"data": {
+			"limits": [
+				{"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 42}
+			]
+		}
+	}`
+	_, rw := newZaiServer(t, body, "", "", "")
+	st := Fetch(context.Background(), rw, "sk-test-key-1234", "intl", "raw", testNow)
+	if st.Status != meter.StatusOK {
+		t.Fatalf("status = %q (%s), want ok", st.Status, st.Message)
+	}
+	if len(st.Limits) != 1 || st.Limits[0].ID != "tokens_5h" || st.Limits[0].WindowMinutes != meter.FiveHourMinutes {
+		t.Fatalf("limits = %+v, want single tokens_5h pool", st.Limits)
 	}
 }
 
@@ -243,7 +301,7 @@ func TestFetchModelUsageFailureIgnored(t *testing.T) {
 	if st.Usage != nil {
 		t.Fatalf("usage = %+v, want nil", st.Usage)
 	}
-	if len(st.Limits) != 3 {
+	if len(st.Limits) != 2 {
 		t.Fatalf("limits = %d", len(st.Limits))
 	}
 }

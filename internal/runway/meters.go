@@ -62,6 +62,13 @@ type Meter struct {
 	ValueText string
 	// Balance marks that meter: it has no window and keeps its own title.
 	Balance bool
+	// Group and GroupDescription carry the model-group section a pool
+	// belongs to (Antigravity); empty means ungrouped. RemainingCaption
+	// overrides the integer remaining percent with a 2-decimal value
+	// ("77.75") when the exact number matters.
+	Group            string
+	GroupDescription string
+	RemainingCaption string
 }
 
 // HasReset reports whether the meter knows its reset time.

@@ -18,12 +18,15 @@ import (
 	"github.com/licoy/quosparr/internal/store"
 )
 
-// Account form kinds index the provider tabs, in store.Providers() order.
+// Account form kinds index the provider tabs, in accountTabProviders() order.
 const (
 	accountKindCodex = iota
 	accountKindClaude
 	accountKindGrok
 	accountKindZai
+	accountKindCursor
+	accountKindKimi
+	accountKindAgy
 )
 
 // accountsPage is wired from settings_view.go.
@@ -47,6 +50,12 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		renderGrokAccounts(c, u, f, rt)
 	case accountKindZai:
 		renderZaiAccounts(c, u, f, rt)
+	case accountKindCursor:
+		renderCursorConfig(c, u, f, rt)
+	case accountKindKimi:
+		renderKimiConfig(c, u, f, rt)
+	case accountKindAgy:
+		renderAgyConfig(c, u, f, rt)
 	default:
 		renderClaudeAccounts(c, u, f, rt)
 	}
@@ -64,17 +73,17 @@ func renderRemoteAccountsPage(c *ui.Context, u *settingsUI, f *accountForm, rt *
 	})
 	priv := u.s.Prefs().AccountPrivacyModeEnabled
 	var rows []codex.ManagedAccount
-	if f.kind == accountKindZai {
-		// The remote status file carries no zai account list; the note stands alone.
-		return
-	}
 	switch f.kind {
 	case accountKindGrok:
 		rows = snap.Grok.Accounts.Sidebar
 	case accountKindClaude:
 		rows = snap.Claude.Accounts.Sidebar
-	default:
+	case accountKindCodex:
 		rows = snap.Accounts.Sidebar
+	default:
+		// The zai key library and the single-configuration tabs (cursor,
+		// kimi, agy) have no remote account list; the note stands alone.
+		return
 	}
 	if len(rows) == 0 {
 		ui.Text(c, l.Text(l10n.KeyAccountsEmpty)).FontSize(12).TextColor(t.TextMuted)
@@ -103,6 +112,12 @@ func accountKindProvider(kind int) store.Provider {
 		return store.ProviderClaude
 	case accountKindZai:
 		return store.ProviderZai
+	case accountKindCursor:
+		return store.ProviderCursor
+	case accountKindKimi:
+		return store.ProviderKimi
+	case accountKindAgy:
+		return store.ProviderAgy
 	default:
 		return store.ProviderCodex
 	}
@@ -233,11 +248,11 @@ func (u *settingsUI) previewClaudeFile(f *accountForm, rt *liveApp) {
 	})
 }
 
-// accountTabProviders are the providers with managed accounts: the Codex,
-// Claude and Grok logins, plus the Z.ai API-key library. cursor, kimi and
-// agy stay read-only and never get an accounts tab.
+// accountTabProviders are the providers with an accounts tab: the Codex,
+// Claude and Grok logins, the Z.ai API-key library, and the three
+// single-configuration meters (cursor token, kimi key, agy paths).
 func accountTabProviders() []store.Provider {
-	return []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai}
+	return []store.Provider{store.ProviderCodex, store.ProviderClaude, store.ProviderGrok, store.ProviderZai, store.ProviderCursor, store.ProviderKimi, store.ProviderAgy}
 }
 
 func accountProviderHeader(c *ui.Context, u *settingsUI, f *accountForm) {
@@ -247,6 +262,7 @@ func accountProviderHeader(c *ui.Context, u *settingsUI, f *accountForm) {
 		if providerTabsOf(c.Key("accounts-provider"), providers, &f.kind, f.busy, providerLabels(l, providers)...) {
 			f.mode, f.paste = "", ""
 			f.selection, f.api = nil, apiDraft{}
+			f.mcfg = meterConfigDraft{}
 		}
 	})
 }
@@ -273,6 +289,7 @@ type accountForm struct {
 	switchRelay        bool
 	api                apiDraft
 	zai                zaiDraft
+	mcfg               meterConfigDraft
 }
 
 func accountFormOf(u *settingsUI) *accountForm {

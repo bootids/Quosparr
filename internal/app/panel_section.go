@@ -44,6 +44,13 @@ func panelModuleOn(m store.Module, p store.Preferences, grok bool) bool {
 	if remoteEnabled(p) && (m == store.ModuleSessionRepair || m == store.ModuleSkills) {
 		return false
 	}
+	// The quota-only providers (cursor, kimi, zai, agy) have no local scan
+	// data of their own; every module except their quota section and the
+	// provider-independent skills list would keep showing the Codex view,
+	// so they stay hidden instead of following the tab with stale data.
+	if quotaOnlyProvider(p.SelectedProvider) && m != store.ModuleQuota && m != store.ModuleSkills {
+		return false
+	}
 	if grok && (m == store.ModuleQuotaEstimate || m == store.ModuleSessionRepair || m == store.ModuleRateLimitResetToday) {
 		return false
 	}

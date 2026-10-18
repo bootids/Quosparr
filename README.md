@@ -8,7 +8,7 @@ English · [简体中文](./README_ZH.md) · [繁體中文](./README_ZH_HANT.md)
 
 <sub><i>Named from <b>Quo</b>ta + <b>Sparr</b>ow</i></sub>
 
-A small sparrow perched in your menu bar, keeping watch over your Codex, Claude, and Grok quota, plus read-only quota meters for Cursor, Kimi, Z.ai, and Antigravity.
+A small sparrow perched in your menu bar, keeping watch over your Codex, Claude, and Grok quota, plus quota meters for Cursor, Kimi, Z.ai, and Antigravity.
 
 Quosparr is a native menu bar / system tray app for macOS, Windows, and Linux. It shows Codex, Claude Code, and Grok subscription quota, reset credits, API-equivalent cost, and local sessions, with separate account management for each provider.
 
@@ -42,9 +42,9 @@ Quosparr is a native menu bar / system tray app for macOS, Windows, and Linux. I
 
 **Quota meters**
 
-- Cursor: subscription usage summary read from the local editor state (read-only): plan, overall, on-demand and team pools with dollar amounts and the billing reset date.
-- Kimi Code: weekly pool and rate-limit windows from the local Kimi CLI credential or KIMI_CODE_API_KEY; read-only.
-- Z.ai Coding Plan: API key stored only in Quosparr's own account store (intl/cn region), showing token/credit/tool pools and a 7-day model usage summary; Antigravity: remaining quota of each pool via the local `agy` CLI. All four are selectable in the panel, status bar and floating window; credentials never leave the machine except to the provider's own endpoint.
+- Cursor: subscription usage summary read from the local editor state (read-only): plan, overall, on-demand and team pools with dollar amounts and the billing reset date. An explicit access token can alternatively be saved in Quosparr's own account store, overriding local discovery; the token is never logged.
+- Kimi Code: the 5-hour and weekly pools with their reset times and rate-limit windows from the local Kimi CLI credential or KIMI_CODE_API_KEY; read-only. An API key can also be saved in Quosparr's account store; precedence: saved key > KIMI_CODE_API_KEY > local CLI credential file.
+- Z.ai Coding Plan: API key stored only in Quosparr's own account store (intl/cn region), showing the 5-hour and weekly token/credit pools with their reset times and a 7-day model usage summary; the first added account becomes current automatically. Antigravity: remaining quota of each pool via the local `agy` CLI, with optional CLI binary path and profile directory overrides in settings. All four are selectable in the panel, status bar and floating window; credentials never leave the machine except to the provider's own endpoint. All four tabs also include a consumption-rate analysis (per-pool burn rate with exhaustion and reset projections) computed from local usage samples containing numbers and timestamps only, never credentials; it is mirrored to the remote read-only view. The Kimi and Z.ai tabs additionally show a token-speed analysis (per-model TTFT and tokens/s, with call counts) computed read-only from local oh-my-pi statistics (numeric usage columns only, never message content or credentials); Cursor and Antigravity keep no local token records, so they show no speed block.
 
 **All providers**
 

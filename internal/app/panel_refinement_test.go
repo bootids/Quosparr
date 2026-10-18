@@ -16,6 +16,14 @@ func TestPanelIdentityWholeRowIsClickable(t *testing.T) {
 	for _, provider := range store.Providers() {
 		t.Run(string(provider), func(t *testing.T) {
 			a, tt := newPanel(t, func(p *store.Preferences) { p.SelectedProvider = provider }, panelFixture(), PanelActions{})
+			if quotaOnlyProvider(provider) {
+				// The quota-only providers have no managed login: the header
+				// stops at the provider strip instead of the Codex identity.
+				if tt.HasText("Ada Lovelace") {
+					t.Fatalf("quota-only provider kept the Codex identity row; texts %q", tt.Texts())
+				}
+				return
+			}
 			label := a.L().Text(l10n.KeyAccounts)
 			if provider == store.ProviderGrok {
 				label = a.L().Text(l10n.KeyGrokAccountsTitle)

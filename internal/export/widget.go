@@ -53,13 +53,22 @@ type WidgetQuota struct {
 	// ValueText is the balance amount of an API relay row, shown instead of
 	// the percentage.
 	ValueText *string `json:"valueText,omitempty"`
+	// Group and GroupDescription carry the model-group section a pool
+	// belongs to (Antigravity); RemainingCaption is the exact 2-decimal
+	// remaining percent when it is not an integer. They are pointers so the
+	// widget snapshot of ungrouped providers stays byte-identical to the
+	// frozen Swift output.
+	Group            *string `json:"group,omitempty"`
+	GroupDescription *string `json:"groupDescription,omitempty"`
+	RemainingCaption *string `json:"remainingCaption,omitempty"`
 }
 
 func clamp(v, lo, hi int) int { return max(lo, min(hi, v)) }
 
 // NewWidgetQuota clamps both percentages to 0..100.
 func NewWidgetQuota(title string, windowMinutes *int, source QuotaSource, used, remaining int, resetsAt *time.Time) WidgetQuota {
-	return WidgetQuota{title, windowMinutes, source, clamp(used, 0, 100), clamp(remaining, 0, 100), resetsAt, nil}
+	return WidgetQuota{Title: title, WindowMinutes: windowMinutes, Source: source,
+		UsedPercent: clamp(used, 0, 100), RemainingPercent: clamp(remaining, 0, 100), ResetsAt: resetsAt}
 }
 
 // DailyTokens is the token count of one day ("2026-08-06").

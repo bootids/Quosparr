@@ -2,10 +2,10 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +19,7 @@ import (
 	"github.com/licoy/quosparr/internal/netx"
 	"github.com/licoy/quosparr/internal/platform"
 	"github.com/licoy/quosparr/internal/runway"
+	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
 	"github.com/licoy/quosparr/internal/zai"
 )
@@ -35,8 +36,15 @@ type meterModule struct {
 	// detect reports whether a credential is currently present; it never
 	// touches the network.
 	detect func(ctx context.Context) bool
-	// label returns the account label shown beside the plan (zai).
-	label func() string
+	// provider is the history key this module's pool samples are recorded
+	// under.
+	provider store.Provider
+	// history persists pool samples between refreshes; nil disables
+	// recording and rate analysis.
+	history *meter.History
+	// speedScan derives the provider's model-speed report from local
+	// session stats; nil (cursor, agy) means the provider has none.
+	speedScan func(ctx context.Context, now time.Time) (speed.Report, error)
 
 	refreshMu sync.Mutex
 
@@ -44,6 +52,8 @@ type meterModule struct {
 	lc       l10n.Localizer
 	raw      meter.State
 	loaded   bool
+	speed    *speed.Report
+	speedErr string
 	onChange func()
 }
 
@@ -56,12 +66,12 @@ func newMeterModule(lc l10n.Localizer, fetch func(ctx context.Context) meter.Sta
 func (m *meterModule) State(now time.Time) runway.MeterState {
 	m.mu.Lock()
 	lc, raw, loaded := m.lc, m.raw, m.loaded
+	speed, speedErr := m.speed, m.speedErr
 	m.mu.Unlock()
 	st := meterStateFromRaw(lc, raw, loaded, now)
-	if m.label != nil && st.Availability != runway.MeterNotConfigured {
-		if label := m.label(); label != "" {
-			st.Detail = append([]runway.DetailLine{{Value: label}}, st.Detail...)
-		}
+	st.Speed, st.SpeedError = speed, speedErr
+	if m.history != nil && st.Availability == runway.MeterReady {
+		st.Rates = meterHistoryRates(currentLimitRates(raw.Limits, m.history.Rates(string(m.provider), now)))
 	}
 	return st
 }
@@ -76,8 +86,35 @@ func (m *meterModule) Refresh(ctx context.Context) error {
 	m.raw = raw
 	m.loaded = true
 	m.mu.Unlock()
+	if m.history != nil && raw.Status == meter.StatusOK {
+		_ = m.history.Record(string(m.provider), raw, time.Now())
+	}
+	// The speed scan is independent of the quota fetch, so it runs after
+	// both success and failure.
+	m.refreshSpeed(ctx)
 	m.fire()
 	return nil
+}
+
+// refreshSpeed runs the provider's speed scan (if any) and caches the result
+// under the state lock. A scan error replaces any previous report — errors
+// are transient and the next refresh retries; an empty report stores nil.
+func (m *meterModule) refreshSpeed(ctx context.Context) {
+	if m.speedScan == nil {
+		return
+	}
+	rep, err := m.speedScan(ctx, time.Now())
+	m.mu.Lock()
+	switch {
+	case err != nil:
+		m.speed, m.speedErr = nil, err.Error()
+	case rep.Empty():
+		m.speed, m.speedErr = nil, ""
+	default:
+		r := rep
+		m.speed, m.speedErr = &r, ""
+	}
+	m.mu.Unlock()
 }
 
 // RefreshLocal re-runs only the credential detection. A credential that
@@ -142,9 +179,6 @@ func meterStateFromRaw(lc l10n.Localizer, raw meter.State, loaded bool, now time
 		Meters:       meterLimitMeters(lc, raw.Limits, now),
 		FetchedAt:    raw.FetchedAt,
 	}
-	if raw.Usage != nil {
-		st.Detail = append(st.Detail, meterUsageLines(raw.Usage)...)
-	}
 	return st
 }
 
@@ -159,6 +193,11 @@ func meterLimitMeters(lc l10n.Localizer, limits []meter.Limit, now time.Time) []
 			w.UsedPercent = int(math.Round(l.Percent))
 		}
 		m := runway.NewMeter(title, w, now, nil, runway.SourceStandard)
+		m.Group = l.Group
+		m.GroupDescription = l.GroupDescription
+		if remaining := 100 - l.Percent; l.HasPercent && remaining != math.Trunc(remaining) {
+			m.RemainingCaption = meterAmount(remaining)
+		}
 		if text := meterValueText(l); text != "" {
 			m.ValueText = text
 		}
@@ -219,38 +258,73 @@ func meterValueText(l meter.Limit) string {
 }
 
 // meterAmount formats a quota number: integers without a decimal part,
-// otherwise the shortest exact decimal. Amounts are data, not UI copy.
+// otherwise the shortest decimal rounded to two places (raw float math
+// leaves artifacts like 91.00000000000009). Amounts are data, not UI copy.
 func meterAmount(v float64) string {
 	if v == math.Trunc(v) && math.Abs(v) < 1e15 {
 		return strconv.FormatInt(int64(v), 10)
 	}
-	return strconv.FormatFloat(v, 'f', -1, 64)
+	return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64)
 }
 
-// meterUsageLines renders a fixed-lookback usage summary (zai model usage)
-// as plain detail rows; the numbers are data, the labels neutral.
-func meterUsageLines(u *meter.Usage) []runway.DetailLine {
-	lines := make([]runway.DetailLine, 0, len(u.Models)+len(u.Features)+2)
-	for _, m := range u.Models {
-		lines = append(lines, runway.DetailLine{Value: fmt.Sprintf("%s: %s", m.Name, meterAmount(m.Tokens))})
+// currentLimitRates keeps only the rate rows whose pool still exists in the
+// current limits; history leftovers from pools that disappeared (for example
+// after a window filter change) must not keep rendering.
+func currentLimitRates(limits []meter.Limit, rs []meter.Rate) []meter.Rate {
+	if len(rs) == 0 {
+		return nil
 	}
-	if u.TotalCalls > 0 {
-		lines = append(lines, runway.DetailLine{Value: "calls: " + meterAmount(u.TotalCalls)})
+	ids := make(map[string]bool, len(limits))
+	for _, l := range limits {
+		ids[l.ID] = true
 	}
-	if u.TotalTokens > 0 {
-		lines = append(lines, runway.DetailLine{Value: "tokens: " + meterAmount(u.TotalTokens)})
+	kept := make([]meter.Rate, 0, len(rs))
+	for _, r := range rs {
+		if ids[r.ID] {
+			kept = append(kept, r)
+		}
 	}
-	for _, f := range u.Features {
-		lines = append(lines, runway.DetailLine{Value: fmt.Sprintf("%s: %s", f.ID, meterAmount(f.Used))})
+	if len(kept) == 0 {
+		return nil
 	}
-	return lines
+	return kept
+}
+
+// meterHistoryRates maps the derived pool rates to the runway mirror,
+// field for field.
+func meterHistoryRates(rs []meter.Rate) []runway.MeterRate {
+	if len(rs) == 0 {
+		return nil
+	}
+	rows := make([]runway.MeterRate, 0, len(rs))
+	for _, r := range rs {
+		rows = append(rows, runway.MeterRate{
+			ID:         r.ID,
+			Title:      r.Title,
+			Unit:       r.Unit,
+			IsPercent:  r.IsPercent,
+			PerHour:    r.PerHour,
+			HasRate:    r.HasRate,
+			Samples:    r.Samples,
+			From:       r.From,
+			To:         r.To,
+			ExhaustsAt: r.ExhaustsAt,
+			HasExhaust: r.HasExhaust,
+			ResetsAt:   r.ResetsAt,
+			HasReset:   r.HasReset,
+			AtReset:    r.AtReset,
+			HasAtReset: r.HasAtReset,
+		})
+	}
+	return rows
 }
 
 // newMeterModules builds the four quota-only provider modules and their
 // Options.Meters map. Credentials and environment are re-read inside every
-// fetch, so nothing is captured. The zai store and module are returned for
-// the accounts page.
-func newMeterModules(home string, prefs store.Preferences, langs []string) (map[store.Provider]runway.MeterProvider, *zai.Store, *meterModule) {
+// fetch, so nothing is captured. The concrete modules are returned for the
+// accounts page (configuration changes refresh them); the zai store and
+// module serve the zai tab.
+func newMeterModules(home string, prefs store.Preferences, langs []string) (map[store.Provider]runway.MeterProvider, map[store.Provider]*meterModule, *zai.Store, *meterModule) {
 	lc := l10n.ForPreference(string(prefs.Language), langs)
 	doer := func(ctx context.Context) meter.Doer {
 		client, err := netx.ClientFor(ctx, netx.WithoutCookies)
@@ -259,8 +333,20 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 		}
 		return meter.NoRedirectClient(client)
 	}
+	root := platform.RunwayDir(home)
 	cursorMod := newMeterModule(lc,
 		func(ctx context.Context) meter.State {
+			token, ok, err := cursor.LoadConfig(root)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "cursor: read configuration failed")
+			}
+			if ok {
+				cred, usable, terr := cursor.CredentialFromToken(token)
+				if terr != nil || !usable {
+					return meter.Failed(meter.StatusAuth, "cursor: configured token is invalid")
+				}
+				return cursor.Fetch(ctx, doer(ctx), cred, time.Now())
+			}
 			cred, ok, err := cursor.LoadCredential(ctx, cursor.StateDBPath(home))
 			if err != nil {
 				return meter.Failed(meter.StatusParse, "cursor: read credential store failed")
@@ -271,12 +357,24 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 			return cursor.Fetch(ctx, doer(ctx), cred, time.Now())
 		},
 		func(ctx context.Context) bool {
-			_, ok, err := cursor.LoadCredential(ctx, cursor.StateDBPath(home))
+			token, ok, err := cursor.LoadConfig(root)
+			if err != nil {
+				return false
+			}
+			if ok {
+				_, usable, terr := cursor.CredentialFromToken(token)
+				return terr == nil && usable
+			}
+			_, ok, err = cursor.LoadCredential(ctx, cursor.StateDBPath(home))
 			return err == nil && ok
 		})
 	kimiMod := newMeterModule(lc,
 		func(ctx context.Context) meter.State {
-			cred, ok, err := kimi.LoadCredential(os.Getenv("KIMI_CODE_API_KEY"), kimi.CredentialsPath(os.Getenv("KIMI_SHARE_DIR"), home))
+			key, err := kimiMeterKey(root)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "kimi: read configuration failed")
+			}
+			cred, ok, err := kimi.LoadCredential(key, kimi.CredentialsPath(os.Getenv("KIMI_SHARE_DIR"), home))
 			if err != nil {
 				return meter.Failed(meter.StatusParse, "kimi: read credentials failed")
 			}
@@ -286,10 +384,17 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 			return kimi.Fetch(ctx, doer(ctx), cred, time.Now())
 		},
 		func(context.Context) bool {
-			_, ok, err := kimi.LoadCredential(os.Getenv("KIMI_CODE_API_KEY"), kimi.CredentialsPath(os.Getenv("KIMI_SHARE_DIR"), home))
+			key, err := kimiMeterKey(root)
+			if err != nil {
+				return false
+			}
+			_, ok, err := kimi.LoadCredential(key, kimi.CredentialsPath(os.Getenv("KIMI_SHARE_DIR"), home))
 			return err == nil && ok
 		})
-	zstore, err := zai.LoadStore(platform.RunwayDir(home))
+	kimiMod.speedScan = func(ctx context.Context, now time.Time) (speed.Report, error) {
+		return meter.ScanOMPSpeed(ctx, filepath.Join(home, ".omp", "stats.db"), []string{"kimi-code"}, now)
+	}
+	zstore, err := zai.LoadStore(root)
 	if err != nil {
 		log.Println("zai accounts: load failed")
 		zstore = nil
@@ -328,45 +433,64 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 			_, _, _, ok := zaiCurrent()
 			return ok
 		})
-	zaiMod.label = func() string {
-		if zstore == nil {
-			return ""
-		}
-		id, err := zstore.Current()
-		if err != nil || id == "" {
-			return ""
-		}
-		rows, err := zstore.Rows()
-		if err != nil {
-			return ""
-		}
-		for _, r := range rows {
-			if r.ID == id {
-				if r.Label != "" {
-					return r.Label
-				}
-				return r.KeyHint
-			}
-		}
-		return ""
+	zaiMod.speedScan = func(ctx context.Context, now time.Time) (speed.Report, error) {
+		return meter.ScanOMPSpeed(ctx, filepath.Join(home, ".omp", "stats.db"), []string{"zai"}, now)
 	}
 	agyMod := newMeterModule(lc,
 		func(ctx context.Context) meter.State {
-			d, ok := agy.Detect("", home)
-			if !ok {
+			d, found, err := agyMeterDiscovery(root, home)
+			if err != nil {
+				return meter.Failed(meter.StatusParse, "agy: read configuration failed")
+			}
+			if !found {
 				return meter.NotConfigured()
 			}
 			return agy.Fetch(ctx, d.Bin, time.Now())
 		},
 		func(context.Context) bool {
-			_, ok := agy.Detect("", home)
-			return ok
+			_, found, err := agyMeterDiscovery(root, home)
+			return err == nil && found
 		})
-	meters := map[store.Provider]runway.MeterProvider{
+	mods := map[store.Provider]*meterModule{
 		store.ProviderCursor: cursorMod,
 		store.ProviderKimi:   kimiMod,
 		store.ProviderZai:    zaiMod,
 		store.ProviderAgy:    agyMod,
 	}
-	return meters, zstore, zaiMod
+	hist := meter.LoadHistory(filepath.Join(root, "meter-history.json"))
+	meters := make(map[store.Provider]runway.MeterProvider, len(mods))
+	for p, m := range mods {
+		m.provider = p
+		m.history = hist
+		meters[p] = m
+	}
+	return meters, mods, zstore, zaiMod
+}
+
+// kimiMeterKey resolves the Kimi Code credential key: the explicitly
+// configured API key wins over KIMI_CODE_API_KEY; "" when neither is set.
+func kimiMeterKey(root string) (string, error) {
+	key, ok, err := kimi.LoadConfig(root)
+	if err != nil {
+		return "", err
+	}
+	if ok {
+		return key, nil
+	}
+	return os.Getenv("KIMI_CODE_API_KEY"), nil
+}
+
+// agyMeterDiscovery resolves the Antigravity CLI location: the explicit
+// configuration's overrides win over auto-discovery.
+func agyMeterDiscovery(root, home string) (agy.Discovery, bool, error) {
+	cfg, ok, err := agy.LoadConfig(root)
+	if err != nil {
+		return agy.Discovery{}, false, err
+	}
+	if ok {
+		d, found := agy.DetectIn(cfg.Bin, cfg.ProfileDir, home)
+		return d, found, nil
+	}
+	d, found := agy.Detect("", home)
+	return d, found, nil
 }

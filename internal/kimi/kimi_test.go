@@ -69,7 +69,7 @@ func TestFetchCounts(t *testing.T) {
 		t.Fatalf("FetchedAt = %v, want %v", state.FetchedAt, testNow)
 	}
 	weekly := byID(t, state.Limits, "7d")
-	if weekly.Unit != "unknown" || weekly.WindowMinutes != meter.WeeklyMinutes {
+	if weekly.Unit != "" || weekly.WindowMinutes != meter.WeeklyMinutes {
 		t.Fatalf("7d row = %+v", weekly)
 	}
 	if weekly.Used != 28 || weekly.LimitValue != 100 || weekly.Remaining != 72 {
@@ -116,9 +116,83 @@ func TestFetchRatioPools(t *testing.T) {
 	if !weekly.HasReset || !weekly.ResetsAt.Equal(time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("limit_7d reset = %v", weekly.ResetsAt)
 	}
-	monthly := byID(t, state.Limits, "limit_month_total")
-	if !monthly.HasPercent || math.Abs(monthly.Percent-0.56) > 1e-9 || monthly.WindowMinutes != meter.MonthlyMinutes {
-		t.Fatalf("limit_month_total = %+v, want 0.56%% / monthly", monthly)
+	if len(state.Limits) != 2 {
+		t.Fatalf("limits = %+v, want only the 5h and 7d pools", state.Limits)
+	}
+	for _, l := range state.Limits {
+		if l.WindowMinutes != meter.FiveHourMinutes && l.WindowMinutes != meter.WeeklyMinutes {
+			t.Fatalf("limit %q window %d survived the filter", l.ID, l.WindowMinutes)
+		}
+	}
+}
+
+// TestNormalizeKeepsOnly5hAnd7d feeds every representation of every window
+// (usage block, limits[], usages map incl. monthly) and expects exactly one
+// pool per kept window. Both the limits[] and usages rows carry percent data,
+// so the limits[] entry wins the tie by rank.
+func TestNormalizeKeepsOnly5hAnd7d(t *testing.T) {
+	body := `{
+		"usage": {"limit": 100, "used": 30, "remaining": 70},
+		"limits": [
+			{"window": {"duration": 300, "timeUnit": "TIME_UNIT_MINUTE"},
+			 "detail": {"limit": 100, "remaining": 40}},
+			{"window": {"duration": 168, "timeUnit": "TIME_UNIT_HOUR"},
+			 "detail": {"limit": 100, "remaining": 10}},
+			{"window": {"duration": 1, "timeUnit": "TIME_UNIT_DAY"},
+			 "detail": {"limit": 100, "remaining": 90}}
+		],
+		"usages": {
+			"limit_5h": {"used_ratio": 0.625},
+			"limit_7d": {"used_ratio": 0.125},
+			"limit_month_total": {"used_ratio": 0.0056}
+		}
+	}`
+	limits, err := normalize([]byte(body))
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if len(limits) != 2 {
+		t.Fatalf("limits = %+v, want exactly 5h and 7d", limits)
+	}
+	if limits[0].ID != "5h" || limits[1].ID != "7d" {
+		t.Fatalf("ids = %q, %q; want the percent-bearing limits[] rows 5h, 7d", limits[0].ID, limits[1].ID)
+	}
+	if !limits[0].HasPercent || limits[0].Percent != 60 || !limits[1].HasPercent || limits[1].Percent != 90 {
+		t.Fatalf("limits[] percent rows lost: %+v", limits)
+	}
+}
+
+// TestNormalizeSingleWindow expects a lone 5h pool to pass through alone.
+func TestNormalizeSingleWindow(t *testing.T) {
+	limits, err := normalize([]byte(`{
+		"limits": [
+			{"window": {"duration": 5, "timeUnit": "TIME_UNIT_HOUR"},
+			 "detail": {"limit": 100, "used": 1, "remaining": 99}}
+		]
+	}`))
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if len(limits) != 1 || limits[0].ID != "5h" || limits[0].WindowMinutes != meter.FiveHourMinutes {
+		t.Fatalf("limits = %+v, want single 5h pool", limits)
+	}
+}
+
+// TestNormalizePrefersPercent checks a percent-bearing usages row beats a
+// percent-less limits[] entry for the same window.
+func TestNormalizePrefersPercent(t *testing.T) {
+	limits, err := normalize([]byte(`{
+		"limits": [
+			{"window": {"duration": 168, "timeUnit": "TIME_UNIT_HOUR"},
+			 "detail": {"remaining": 10}}
+		],
+		"usages": {"limit_7d": {"used_ratio": 0.125}}
+	}`))
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if len(limits) != 1 || limits[0].ID != "limit_7d" || !limits[0].HasPercent || limits[0].Percent != 12.5 {
+		t.Fatalf("limits = %+v, want the percent-bearing limit_7d row", limits)
 	}
 }
 
@@ -144,7 +218,9 @@ func TestFetchParseFailure(t *testing.T) {
 	}
 }
 
-func TestFetchDuplicateIDs(t *testing.T) {
+// TestFetchDuplicateWindowKeepsOnePool feeds two 7d representations (usage
+// block and limits[]) and expects the limits[] entry to win the single slot.
+func TestFetchDuplicateWindowKeepsOnePool(t *testing.T) {
 	body := `{
 		"usage": {"limit": 10, "used": 1, "remaining": 9},
 		"limits": [
@@ -157,14 +233,11 @@ func TestFetchDuplicateIDs(t *testing.T) {
 	if state.Status != meter.StatusOK {
 		t.Fatalf("status = %q (%s)", state.Status, state.Message)
 	}
-	if len(state.Limits) != 2 {
-		t.Fatalf("limits = %+v, want 2 rows", state.Limits)
+	if len(state.Limits) != 1 {
+		t.Fatalf("limits = %+v, want a single 7d row", state.Limits)
 	}
-	if state.Limits[0].ID != "7d" || state.Limits[1].ID != "7d#2" {
-		t.Fatalf("ids = %q, %q; want 7d, 7d#2", state.Limits[0].ID, state.Limits[1].ID)
-	}
-	if state.Limits[1].Used != 2 {
-		t.Fatalf("7d#2 used = %v, want 2", state.Limits[1].Used)
+	if state.Limits[0].ID != "7d" || state.Limits[0].Used != 2 {
+		t.Fatalf("7d row = %+v, want the limits[] entry with used 2", state.Limits[0])
 	}
 }
 

@@ -47,14 +47,23 @@ func grokMeterRow(c *ui.Context, l l10n.Localizer, m runway.Meter, primary bool,
 		t := c.Theme()
 		ui.Column(c).Gap(6).Children(func() {
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				percent := l10n.Format("%d%% %s", m.RemainingPercent, l.Text(l10n.KeyLeft))
+				if m.RemainingCaption != "" {
+					percent = l10n.Format("%s%% %s", m.RemainingCaption, l.Text(l10n.KeyLeft))
+				}
 				ui.Text(c, m.Title).FontSize(fsCallout).FontWeight(600).Grow(1).Basis(0)
-				ui.Text(c, l10n.Format("%d%% %s", m.RemainingPercent, l.Text(l10n.KeyLeft))).FontSize(fsCallout).FontWeight(600).FontFeatures("tnum").TextColor(healthInk(t, m.Health)).SingleLine()
+				ui.Text(c, percent).FontSize(fsCallout).FontWeight(600).FontFeatures("tnum").TextColor(healthInk(t, m.Health)).SingleLine()
 			})
 			quotaBar(c, m)
 			if m.HasReset() {
 				ui.Row(c).Children(func() {
 					ui.Spacer(c).Grow(1)
 					resetLine(c, l, "reset-grok", m.ResetsAt, now, rs)
+				})
+			} else if m.UsedPercent == 0 && m.RemainingPercent == 100 {
+				ui.Row(c).Children(func() {
+					ui.Spacer(c).Grow(1)
+					dimText(c, tx(l, xMeterQuotaAvailable))
 				})
 			}
 		})

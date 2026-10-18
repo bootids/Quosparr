@@ -104,13 +104,19 @@ func (s *Store) Rows() ([]Row, error) {
 	return idx.Rows, nil
 }
 
-// Current returns the current account id, empty when none is set.
+// Current returns the current account id, empty when none is set. It
+// self-heals without persisting: when the stored current is empty or points
+// to a row that no longer exists (e.g. a hand-edited index) and exactly one
+// account remains, that account is returned.
 func (s *Store) Current() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	idx, err := s.loadIndex()
 	if err != nil {
 		return "", err
+	}
+	if _, ok := findRow(idx, idx.Current); !ok && len(idx.Rows) == 1 {
+		return idx.Rows[0].ID, nil
 	}
 	return idx.Current, nil
 }
@@ -137,8 +143,10 @@ func (s *Store) LoadKey(id string) (string, error) {
 
 // Add stores a new account and returns its generated id. The id is stable
 // for the same key (hash of the trimmed key), so re-adding a key updates
-// its row instead of duplicating it. region must be "intl" or "cn";
-// authScheme must be "raw" or "bearer"; the key must not be empty.
+// its row instead of duplicating it. The first account added to an empty
+// store becomes the current one; adding more accounts never changes the
+// current selection. region must be "intl" or "cn"; authScheme must be
+// "raw" or "bearer"; the key must not be empty.
 func (s *Store) Add(label, key, region, authScheme string) (string, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -163,6 +171,9 @@ func (s *Store) Add(label, key, region, authScheme string) (string, error) {
 		return "", err
 	}
 	upsertRow(&idx, row)
+	if idx.Current == "" {
+		idx.Current = id
+	}
 	if err := s.saveIndex(idx); err != nil {
 		return "", err
 	}
@@ -206,7 +217,8 @@ func (s *Store) Update(id, label string, key *string, region, authScheme string)
 }
 
 // Delete removes one account. Deleting the current account clears the
-// current selection.
+// stored selection; when exactly one account remains afterwards, Current
+// self-heals to it without touching the index.
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

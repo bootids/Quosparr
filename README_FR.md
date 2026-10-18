@@ -8,7 +8,7 @@
 
 <sub><i>Nom formé de <b>Quo</b>ta (quota) + <b>Sparr</b>ow (moineau)</i></sub>
 
-Un petit moineau perché dans votre barre de menus, qui veille sur vos quotas Codex, Claude et Grok, et affiche aussi des compteurs de quota en lecture seule pour Cursor, Kimi, Z.ai et Antigravity.
+Un petit moineau perché dans votre barre de menus, qui veille sur vos quotas Codex, Claude et Grok, et affiche aussi des compteurs de quota pour Cursor, Kimi, Z.ai et Antigravity.
 
 Quosparr est une application native de barre de menus / zone de notification pour macOS, Windows et Linux. Elle affiche les quotas Codex, d’abonnement Claude Code et Grok, les reset credits, le coût équivalent API et les sessions locales, avec une gestion des comptes séparée pour chaque fournisseur.
 
@@ -42,9 +42,9 @@ Quosparr est une application native de barre de menus / zone de notification pou
 
 **Compteurs de quota**
 
-- Cursor : résumé de l’usage de l’abonnement lu depuis l’état local de l’éditeur (lecture seule) : plan, pools global, à la demande et équipe avec leurs montants en dollars, et la date de réinitialisation de la facturation.
-- Kimi Code : pool hebdomadaire et fenêtres de limite de débit depuis l’identifiant local du CLI Kimi ou KIMI_CODE_API_KEY ; lecture seule.
-- Z.ai Coding Plan : clé API stockée uniquement dans le magasin de comptes de Quosparr lui-même (région intl/cn), affichant les pools de jetons/crédits/outils et un résumé d’usage des modèles sur 7 jours ; Antigravity : quota restant de chaque pool via le CLI local `agy`. Les quatre sont sélectionnables dans le panneau, la barre d’état et la fenêtre flottante ; les identifiants ne quittent jamais la machine, sauf vers le point d’accès du fournisseur lui-même.
+- Cursor : résumé de l’usage de l’abonnement lu depuis l’état local de l’éditeur (lecture seule) : plan, pools global, à la demande et équipe avec leurs montants en dollars, et la date de réinitialisation de la facturation. En alternative, un jeton d’accès explicite peut être enregistré dans le magasin de comptes de Quosparr lui-même — il prime sur la découverte locale et n’est jamais journalisé.
+- Kimi Code : pools de 5 heures et hebdomadaire avec leurs heures de réinitialisation et fenêtres de limite de débit depuis l’identifiant local du CLI Kimi ou KIMI_CODE_API_KEY ; lecture seule. Une clé API peut aussi être enregistrée dans le magasin de comptes de Quosparr ; priorité : clé enregistrée > KIMI_CODE_API_KEY > fichier d’identifiants local du CLI.
+- Z.ai Coding Plan : clé API stockée uniquement dans le magasin de comptes de Quosparr lui-même (région intl/cn), affichant les pools de jetons/crédits de 5 heures et hebdomadaire avec leurs heures de réinitialisation et un résumé d’usage des modèles sur 7 jours ; le premier compte ajouté devient automatiquement le compte courant. Antigravity : quota restant de chaque pool via le CLI local `agy`, avec remplacements facultatifs du chemin du binaire CLI et du répertoire de profil dans les réglages. Les quatre sont sélectionnables dans le panneau, la barre d’état et la fenêtre flottante ; les identifiants ne quittent jamais la machine, sauf vers le point d’accès du fournisseur lui-même. Les quatre onglets incluent aussi une analyse du rythme de consommation (taux de consommation par pool avec projections d’épuisement et de réinitialisation), calculée à partir d’échantillons d’usage locaux ne contenant que des nombres et des horodatages, jamais d’identifiants ; elle est également reflétée dans la vue distante en lecture seule. Les onglets Kimi et Z.ai affichent de plus une analyse de la vitesse des jetons (TTFT et tokens/s par modèle, avec nombre d’appels), calculée en lecture seule à partir des statistiques locales d’oh-my-pi (colonnes d’usage numériques uniquement, jamais le contenu des messages ni d’identifiants) ; Cursor et Antigravity ne conservent aucun registre local de jetons et n’affichent donc pas ce bloc.
 
 **Tous les fournisseurs**
 

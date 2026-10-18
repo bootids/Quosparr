@@ -64,6 +64,10 @@ type Limit struct {
 	HasPercent    bool
 	ResetsAt      time.Time
 	HasReset      bool
+	// Group and GroupDescription carry the model-group section a pool
+	// belongs to (Antigravity); empty means ungrouped.
+	Group            string
+	GroupDescription string
 }
 
 // UsageModel is one model's token total inside a Usage summary.

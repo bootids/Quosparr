@@ -98,8 +98,12 @@ func Fetch(ctx context.Context, client meter.Doer, key, region, authScheme strin
 	state.Limits = make([]meter.Limit, 0, len(doc.Data.Limits))
 	var usageDetails []json.RawMessage
 	for _, l := range doc.Data.Limits {
-		state.Limits = append(state.Limits, normalizeLimit(l))
 		usageDetails = append(usageDetails, l.UsageDetails...)
+		// Only the 5h and 7d windows surface; monthly pools and limits
+		// with an unknown window are dropped, model usage is unaffected.
+		if m := normalizeLimit(l); m.WindowMinutes == meter.FiveHourMinutes || m.WindowMinutes == meter.WeeklyMinutes {
+			state.Limits = append(state.Limits, m)
+		}
 	}
 	state.Usage = fetchModelUsage(ctx, client, base, key, authScheme, now, usageDetails)
 	state.FetchedAt = now

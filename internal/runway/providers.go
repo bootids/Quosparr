@@ -245,6 +245,35 @@ type MeterState struct {
 	Detail []DetailLine
 	// FetchedAt is the last successful fetch (zero when never).
 	FetchedAt time.Time
+	// Rates is the per-pool consumption-rate analysis; empty when the
+	// provider has no usable history.
+	Rates []MeterRate
+	// Speed is the model speed of the provider's recent sessions (kimi,
+	// zai), nil when not analysed; SpeedError is the sanitized user-facing
+	// error of its last scan.
+	Speed      *speed.Report
+	SpeedError string
+}
+
+// MeterRate is the runway mirror of meter.Rate: one pool's derived
+// consumption-rate analysis (plain titles, numbers and timestamps, never
+// credentials). Times are zero when their Has* flag is false.
+type MeterRate struct {
+	ID         string
+	Title      string
+	Unit       string
+	IsPercent  bool
+	PerHour    float64
+	HasRate    bool
+	Samples    int
+	From       time.Time
+	To         time.Time
+	ExhaustsAt time.Time
+	HasExhaust bool
+	ResetsAt   time.Time
+	HasReset   bool
+	AtReset    float64
+	HasAtReset bool
 }
 
 // MeterProvider is the seam a quota-only provider plugs into. The locking

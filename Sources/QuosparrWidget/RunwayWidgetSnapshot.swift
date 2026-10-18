@@ -27,6 +27,12 @@ public struct RunwayWidgetQuota: Codable, Equatable, Sendable {
     public var resetsAt: Date?
     /// API relay balance shown instead of the percentage ("$12.34"); absent on quota windows.
     public var valueText: String?
+    /// Model-group section of a quota-only provider pool (Antigravity); the
+    /// widget does not render it, decoders ignore it when absent.
+    public var group: String?
+    public var groupDescription: String?
+    /// Exact fractional remaining percent ("77.75"); absent when integral.
+    public var remainingCaption: String?
 
     public init(
         title: String,
@@ -35,7 +41,10 @@ public struct RunwayWidgetQuota: Codable, Equatable, Sendable {
         usedPercent: Int,
         remainingPercent: Int,
         resetsAt: Date?,
-        valueText: String? = nil)
+        valueText: String? = nil,
+        group: String? = nil,
+        groupDescription: String? = nil,
+        remainingCaption: String? = nil)
     {
         self.title = title
         self.windowMinutes = windowMinutes
@@ -44,6 +53,9 @@ public struct RunwayWidgetQuota: Codable, Equatable, Sendable {
         self.remainingPercent = max(0, min(100, remainingPercent))
         self.resetsAt = resetsAt
         self.valueText = valueText
+        self.group = group
+        self.groupDescription = groupDescription
+        self.remainingCaption = remainingCaption
     }
 }
 

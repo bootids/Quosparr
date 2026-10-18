@@ -1,5 +1,6 @@
 ---
 id: 20261018-remote-panel-parity
+title: 远程只读模式的面板功能对齐（本地读取一致）
 status: done
 kind: plan
 parent: 20261018-ssh-remote-view

@@ -66,7 +66,18 @@ func meterPanelBlock(m MeterState) export.MeterPanelBlock {
 	for _, d := range m.Detail {
 		b.Detail = append(b.Detail, export.PanelDetailLine{Title: d.Title, Value: d.Value})
 	}
+	for _, r := range m.Rates {
+		b.Rates = append(b.Rates, export.MeterPanelRate{
+			ID: r.ID, Title: r.Title, Unit: r.Unit, IsPercent: r.IsPercent,
+			PerHour: r.PerHour, HasRate: r.HasRate, Samples: r.Samples,
+			From: r.From, To: r.To,
+			ExhaustsAt: r.ExhaustsAt, HasExhaust: r.HasExhaust,
+			ResetsAt: r.ResetsAt, HasReset: r.HasReset,
+			AtReset: r.AtReset, HasAtReset: r.HasAtReset,
+		})
+	}
 	b.FetchedAt = timePtr(m.FetchedAt)
+	b.Speed = panelSpeed(m.Speed)
 	return b
 }
 

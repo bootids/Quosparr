@@ -33,13 +33,21 @@ type Discovery struct {
 	ProfileDir string
 }
 
-// Detect finds the Antigravity CLI binary and profile directory around home.
-// binOverride is used as-is when it points to an existing executable file;
-// otherwise the binary is looked up on PATH and finally at
-// <home>/.local/bin/agy. The profile directory defaults to
-// <home>/.gemini/antigravity-cli and must be an existing directory. ok is
-// false when either side is missing. Detect never reads file contents.
+// Detect finds the Antigravity CLI binary and profile directory around
+// home, defaulting the profile directory to <home>/.gemini/antigravity-cli.
+// It is DetectIn without a profile directory override.
 func Detect(binOverride, home string) (Discovery, bool) {
+	return DetectIn(binOverride, "", home)
+}
+
+// DetectIn finds the Antigravity CLI binary and profile directory around
+// home. binOverride is used as-is when it points to an existing executable
+// file; otherwise the binary is looked up on PATH and finally at
+// <home>/.local/bin/agy. A non-empty profileDirOverride replaces the
+// default profile directory <home>/.gemini/antigravity-cli; either way the
+// directory must exist. ok is false when either side is missing. DetectIn
+// never reads file contents.
+func DetectIn(binOverride, profileDirOverride, home string) (Discovery, bool) {
 	bin := ""
 	if binOverride != "" && isExecutable(binOverride) {
 		bin = binOverride
@@ -59,7 +67,10 @@ func Detect(binOverride, home string) (Discovery, bool) {
 			bin = p
 		}
 	}
-	profile := filepath.Join(home, ".gemini", "antigravity-cli")
+	profile := profileDirOverride
+	if profile == "" {
+		profile = filepath.Join(home, ".gemini", "antigravity-cli")
+	}
 	if fi, err := os.Stat(profile); err != nil || !fi.IsDir() {
 		return Discovery{}, false
 	}
@@ -159,12 +170,14 @@ type usageDoc struct {
 }
 
 type group struct {
-	Name    string   `json:"name"`
-	Buckets []bucket `json:"buckets"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Buckets     []bucket `json:"buckets"`
 }
 
 type bucket struct {
 	ID                string          `json:"id"`
+	Name              string          `json:"name"`
 	Window            string          `json:"window"`
 	RemainingFraction json.RawMessage `json:"remaining_fraction"`
 	ResetTime         json.RawMessage `json:"reset_time"`
@@ -185,13 +198,20 @@ func limits(groups []group) []meter.Limit {
 			}
 			l := meter.Limit{
 				ID:            id,
-				Title:         id,
+				Title:         b.Name,
 				Unit:          "percent",
 				WindowMinutes: windowMinutes(window),
 				Used:          meter.NaN(),
 				LimitValue:    meter.NaN(),
 				Remaining:     meter.NaN(),
 				Percent:       meter.NaN(),
+				Group:         g.Name,
+			}
+			if l.Title == "" {
+				l.Title = id
+			}
+			if g.Description != "" {
+				l.GroupDescription = g.Description
 			}
 			if f, ok := parseNumber(b.RemainingFraction); ok {
 				l.Percent = (1 - f) * 100
@@ -200,6 +220,11 @@ func limits(groups []group) []meter.Limit {
 			if t, ok := parseTime(b.ResetTime); ok {
 				l.ResetsAt = t.UTC()
 				l.HasReset = true
+			}
+			if l.HasPercent && l.Percent <= 0 {
+				// A full pool shows no countdown in the official panel.
+				l.HasReset = false
+				l.ResetsAt = time.Time{}
 			}
 			out = append(out, l)
 		}

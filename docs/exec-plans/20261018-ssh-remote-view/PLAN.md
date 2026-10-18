@@ -1,5 +1,6 @@
 ---
 id: 20261018-ssh-remote-view
+title: MacBook 端经 SSH 只读查看开发机 Quosparr 数据
 status: done
 kind: plan
 created: 2026-10-18

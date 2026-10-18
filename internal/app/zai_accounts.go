@@ -1,9 +1,7 @@
 package app
 
 import (
-	"context"
 	"strings"
-	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/licoy/quosparr/internal/l10n"
@@ -208,14 +206,7 @@ func (rt *liveApp) zaiRows() ([]zai.Row, error) {
 // refreshZaiMeter refetches the zai quota after an account change. The
 // module's onChange republishes the snapshot, which redraws the UI.
 func (rt *liveApp) refreshZaiMeter() {
-	if rt.zaiMod == nil {
-		return
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_ = rt.zaiMod.Refresh(ctx)
-	}()
+	rt.refreshMeter(store.ProviderZai)
 }
 
 func (rt *liveApp) zaiSetCurrent(l l10n.Localizer, id string) string {

@@ -1,6 +1,7 @@
 package zai
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -139,6 +140,105 @@ func TestAddSameKeyIsStable(t *testing.T) {
 	rows, _ := s.Rows()
 	if len(rows) != 1 || rows[0].Label != "second" {
 		t.Fatalf("rows = %+v", rows)
+	}
+}
+
+func TestAddFirstAccountBecomesCurrent(t *testing.T) {
+	s := newStore(t)
+	id, err := s.Add("only", "sk-cur-key-1", "intl", "raw")
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if cur, _ := s.Current(); cur != id {
+		t.Fatalf("current = %q, want %q", cur, id)
+	}
+}
+
+func TestAddSecondAccountKeepsCurrent(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("a", "sk-cur-key-2", "intl", "raw")
+	b, err := s.Add("b", "sk-cur-key-3", "intl", "raw")
+	if err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if b == a {
+		t.Fatal("ids must differ")
+	}
+	if cur, _ := s.Current(); cur != a {
+		t.Fatalf("current = %q, want %q", cur, a)
+	}
+}
+
+func TestReAddSameKeyKeepsCurrent(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("first", "sk-cur-key-4", "intl", "raw")
+	if _, err := s.Add("again", "sk-cur-key-4", "intl", "raw"); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if cur, _ := s.Current(); cur != a {
+		t.Fatalf("current = %q, want %q", cur, a)
+	}
+}
+
+// writeIndex writes a raw index document to test Current self-healing on
+// stores the normal API cannot produce.
+func writeIndex(t *testing.T, s *Store, idx index) {
+	t.Helper()
+	if err := s.saveIndex(idx); err != nil {
+		t.Fatalf("saveIndex: %v", err)
+	}
+}
+
+func TestCurrentSelfHealsEmptyCurrent(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("a", "sk-cur-key-5", "intl", "raw")
+	writeIndex(t, s, index{Version: indexVersion, Rows: []Row{{ID: a}}})
+	if cur, _ := s.Current(); cur != a {
+		t.Fatalf("current = %q, want %q", cur, a)
+	}
+	// self-heal must not persist
+	data, err := os.ReadFile(s.IndexPath())
+	if err != nil || strings.Contains(string(data), `"current": "`+a) {
+		t.Fatalf("index persisted current: %s, err = %v", data, err)
+	}
+}
+
+func TestCurrentSelfHealsStaleCurrent(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("a", "sk-cur-key-6", "intl", "raw")
+	writeIndex(t, s, index{Version: indexVersion, Current: "ghost", Rows: []Row{{ID: a}}})
+	if cur, _ := s.Current(); cur != a {
+		t.Fatalf("current = %q, want %q", cur, a)
+	}
+}
+
+func TestCurrentEmptyWithMultipleRowsAndNoCurrent(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("a", "sk-cur-key-7", "intl", "raw")
+	b, _ := s.Add("b", "sk-cur-key-8", "intl", "raw")
+	writeIndex(t, s, index{Version: indexVersion, Rows: []Row{{ID: a}, {ID: b}}})
+	if cur, _ := s.Current(); cur != "" {
+		t.Fatalf("current = %q, want empty", cur)
+	}
+}
+
+func TestDeleteCurrentWithOneRemainingSelfHeals(t *testing.T) {
+	s := newStore(t)
+	a, _ := s.Add("a", "sk-cur-key-9", "intl", "raw")
+	b, _ := s.Add("b", "sk-cur-key-10", "intl", "raw")
+	if err := s.SetCurrent(a); err != nil {
+		t.Fatalf("SetCurrent: %v", err)
+	}
+	if err := s.Delete(a); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	// The stored selection is cleared, but the sole remaining row
+	// self-heals as the current account without rewriting the index.
+	if cur, _ := s.Current(); cur != b {
+		t.Fatalf("current = %q, want sole remaining %q", cur, b)
+	}
+	if idx, err := os.ReadFile(s.IndexPath()); err == nil && bytes.Contains(idx, []byte(`"current":"`+b+`"`)) {
+		t.Fatal("self-heal must not persist the selection")
 	}
 }
 
