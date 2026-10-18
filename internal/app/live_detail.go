@@ -32,25 +32,26 @@ func (rt *liveApp) queryDetailCost(ctx context.Context, provider store.Provider,
 	case store.ProviderClaude:
 		return rt.queryClaudeDetailCost(ctx, q, now)
 	}
-	if rt.svc == nil {
+	ls := rt.localService()
+	if ls == nil {
 		return usage.Summary{}, errDetailUnavailable
 	}
 	if q.Custom != nil {
-		return rt.svc.QueryCost(ctx, *q.Custom)
+		return ls.QueryCost(ctx, *q.Custom)
 	}
 	switch q.Range {
 	case store.CostRangeCurrent:
-		return rt.svc.QueryCurrentCycleCost(ctx)
+		return rt.localService().QueryCurrentCycleCost(ctx)
 	case store.CostRangePrevious:
-		r, err := rt.svc.ResolvePreviousCycleRange(ctx)
+		r, err := rt.localService().ResolvePreviousCycleRange(ctx)
 		if err != nil {
 			return usage.Summary{}, err
 		}
-		return rt.svc.QueryCost(ctx, r)
+		return rt.localService().QueryCost(ctx, r)
 	case store.CostRangeToday:
-		return rt.svc.QueryCost(ctx, usage.Today(now, time.Local))
+		return rt.localService().QueryCost(ctx, usage.Today(now, time.Local))
 	case store.CostRangeThisMonth:
-		return rt.svc.QueryCost(ctx, usage.ThisMonth(now, time.Local))
+		return rt.localService().QueryCost(ctx, usage.ThisMonth(now, time.Local))
 	default:
 		return usage.Summary{}, errInvalidCostRange
 	}
@@ -112,6 +113,13 @@ func (rt *liveApp) queryClaudeDetailCost(ctx context.Context, q CostQuery, now t
 }
 
 func installDetailActions(rt *liveApp, a *PanelActions) {
+	// Remote mode writes nothing locally: the cost detail, the reaction
+	// store and the session repair are local-only and stay disabled; the
+	// skills page keeps its read-only actions.
+	if rt.remoteMode() {
+		installSkillActions(rt, &a.Skills)
+		return
+	}
 	a.QueryCost = rt.queryDetailCost
 	client := &resettoday.ReactionClient{Store: resettoday.DefaultReactionStore()}
 	a.QueryReaction = client.Fetch

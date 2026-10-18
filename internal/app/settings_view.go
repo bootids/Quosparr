@@ -61,12 +61,13 @@ const (
 	tabFloating
 	tabModules
 	tabNotifications
+	tabRemote
 	tabSkills
 	tabAdvanced
 	tabAbout
 )
 
-var settingsTabs = []settingsTab{tabGeneral, tabAccounts, tabDisplay, tabFloating, tabModules, tabNotifications, tabSkills, tabAdvanced, tabAbout}
+var settingsTabs = []settingsTab{tabGeneral, tabAccounts, tabDisplay, tabFloating, tabModules, tabNotifications, tabRemote, tabSkills, tabAdvanced, tabAbout}
 
 // title is the tab's name in the sidebar and above its page.
 func (t settingsTab) title(l l10n.Localizer) string {
@@ -76,15 +77,15 @@ func (t settingsTab) title(l l10n.Localizer) string {
 	case tabSkills:
 		return tx(l, xSkillsSettingsTab)
 	}
-	return l.Text([...]l10n.Key{l10n.KeyGeneral, l10n.KeyAccounts, l10n.KeyDisplay, "", l10n.KeyPanelModules, l10n.KeyNotificationSettings, "", l10n.KeyAdvanced, l10n.KeyAbout}[t])
+	return l.Text([...]l10n.Key{l10n.KeyGeneral, l10n.KeyAccounts, l10n.KeyDisplay, "", l10n.KeyPanelModules, l10n.KeyNotificationSettings, l10n.KeyRemoteSource, "", l10n.KeyAdvanced, l10n.KeyAbout}[t])
 }
 
 func (t settingsTab) icon() *ui.SVG {
-	return [...]*ui.SVG{icGear, icUsers, icEye, icFloating, icLayout, icBell, icSkill, icSliders, icInfo}[t]
+	return [...]*ui.SVG{icGear, icUsers, icEye, icFloating, icLayout, icBell, icGlobe, icSkill, icSliders, icInfo}[t]
 }
 
 func (t settingsTab) tint() Tint {
-	return [...]Tint{TintGray, TintGreen, TintBlue, TintTeal, TintPurple, TintRed, TintPink, TintOrange, TintIndigo}[t]
+	return [...]Tint{TintGray, TintGreen, TintBlue, TintTeal, TintPurple, TintRed, TintBlue, TintPink, TintOrange, TintIndigo}[t]
 }
 
 //go:embed assets/app-icon.png
@@ -133,6 +134,7 @@ type settingsUI struct {
 	proxyMsgErr   bool
 	proxyMsgGen   int
 	toast         string
+	remote        remoteDraftState
 
 	pickingColor bool
 	customColor  ui.Color
@@ -202,6 +204,8 @@ func (u *settingsUI) pageContent(c *ui.Context) {
 			u.modulesGroup(c)
 		case tabNotifications:
 			u.notificationsGroup(c)
+		case tabRemote:
+			u.remotePage(c)
 		case tabSkills:
 			u.skillsPage(c)
 		case tabAdvanced:
@@ -594,7 +598,7 @@ func (u *settingsUI) advancedPage(c *ui.Context) {
 			}
 		})
 		row(l.Text(l10n.KeyRepairIndex), l.Text(l10n.KeyBackup), func() {
-			if PillButton(c, nil, l.Text(l10n.KeyRepair), a.RepairIndex == nil).Clicked() {
+			if PillButton(c, nil, l.Text(l10n.KeyRepair), a.RepairIndex == nil || remoteEnabled(p)).Clicked() {
 				u.confirmRepair = true
 			}
 		})

@@ -149,7 +149,7 @@ func waitPanelResetIdle(t *testing.T, rt *liveApp) {
 	rt.preferenceWork.idle.Wait()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := rt.svc.WaitIdle(ctx); err != nil {
+	if err := rt.localService().WaitIdle(ctx); err != nil {
 		t.Fatal(err)
 	}
 }

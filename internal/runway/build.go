@@ -140,7 +140,7 @@ func (s *Service) quotaViewLocked(v *CodexView, now time.Time) {
 		v.QuotaText = lc.Text(l10n.KeyStatusError)
 		v.QuotaLines = []DetailLine{{lc.Text(l10n.KeyError), s.quotaErr}}
 	case q != nil:
-		v.QuotaText, v.QuotaLines = s.quotaText(*q)
+		v.QuotaText, v.QuotaLines = quotaText(lc, s.prefs, *q)
 	case s.loggedOut:
 		v.QuotaText = lc.Text(l10n.KeyStatusLogin)
 	default:
@@ -148,8 +148,7 @@ func (s *Service) quotaViewLocked(v *CodexView, now time.Time) {
 	}
 }
 
-func (s *Service) quotaText(q codexapi.QuotaSnapshot) (string, []DetailLine) {
-	lc := s.lc
+func quotaText(lc l10n.Localizer, prefs store.Preferences, q codexapi.QuotaSnapshot) (string, []DetailLine) {
 	unknown := lc.Text(l10n.KeyUnknown)
 	plan := q.Plan
 	if plan == "" {
@@ -163,14 +162,14 @@ func (s *Service) quotaText(q codexapi.QuotaSnapshot) (string, []DetailLine) {
 	text := lc.Text(l10n.KeyPlan) + " " + plan + " · " + title + " " + strconv.Itoa(q.Primary.UsedPercent) + "% · " + weekly
 	lines := []DetailLine{
 		{lc.Text(l10n.KeyPlan), plan},
-		{title, s.windowText(q.Primary, q.UpdatedAt)},
+		{title, windowText(lc, q.Primary, q.UpdatedAt)},
 	}
 	if q.Secondary != nil {
-		lines = append(lines, DetailLine{lc.Text(l10n.KeyWeeklyUsage), s.windowText(*q.Secondary, q.UpdatedAt)})
+		lines = append(lines, DetailLine{lc.Text(l10n.KeyWeeklyUsage), windowText(lc, *q.Secondary, q.UpdatedAt)})
 	}
-	if s.prefs.ShowsModelSpecificQuotaUsage {
+	if prefs.ShowsModelSpecificQuotaUsage {
 		for _, e := range q.AdditionalWindows {
-			lines = append(lines, DetailLine{e.Name, s.windowText(e.Window, q.UpdatedAt)})
+			lines = append(lines, DetailLine{e.Name, windowText(lc, e.Window, q.UpdatedAt)})
 		}
 	}
 	if q.CreditsBalance != nil {
@@ -179,8 +178,7 @@ func (s *Service) quotaText(q codexapi.QuotaSnapshot) (string, []DetailLine) {
 	return text, lines
 }
 
-func (s *Service) windowText(w codexapi.RateWindow, now time.Time) string {
-	lc := s.lc
+func windowText(lc l10n.Localizer, w codexapi.RateWindow, now time.Time) string {
 	reset := ""
 	if !w.ResetsAt.IsZero() {
 		reset = " · " + lc.Text(l10n.KeyResetsIn) + " " + DurationLocalized(w.ResetsAt.Sub(now).Seconds(), lc.Language(), true)
@@ -199,7 +197,7 @@ func (s *Service) creditsViewLocked(v *CodexView) {
 		sum := SummarizeCredits(*c)
 		v.ResetCreditSummary = &sum
 		v.CreditDetails = CreditDetails(lc, *c)
-		v.ResetCreditsText, v.ResetCreditLines = s.creditsText(*c, sum)
+		v.ResetCreditsText, v.ResetCreditLines = creditsText(lc, s.opts.Location, *c, sum)
 	case s.loggedOut:
 		v.ResetCreditsText = lc.Text(l10n.KeyStatusLogin)
 	default:
@@ -212,9 +210,9 @@ func (s *Service) creditsViewLocked(v *CodexView) {
 	}
 }
 
-func (s *Service) creditsText(c codexapi.ResetCreditsSnapshot, sum ResetCreditSummary) (string, []DetailLine) {
-	lc := s.lc
+func creditsText(lc l10n.Localizer, loc *time.Location, c codexapi.ResetCreditsSnapshot, sum ResetCreditSummary) (string, []DetailLine) {
 	lang := lc.Language()
+	location := locOrLocal(loc)
 	suffix := ""
 	if !sum.NextExpiry.IsZero() {
 		suffix = " · " + lc.Text(l10n.KeyLeft) + " " + DurationLocalized(sum.NextExpiry.Sub(c.UpdatedAt).Seconds(), lang, true)
@@ -230,7 +228,7 @@ func (s *Service) creditsText(c codexapi.ResetCreditsSnapshot, sum ResetCreditSu
 		}
 		expiry := lc.Text(l10n.KeyNoExpiry)
 		if !cr.ExpiresAt.IsZero() {
-			expiry = ResetCreditExpiresAt(cr.ExpiresAt, lang, s.opts.Location) + " · " +
+			expiry = ResetCreditExpiresAt(cr.ExpiresAt, lang, location) + " · " +
 				DurationLocalized(cr.ExpiresAt.Sub(c.UpdatedAt).Seconds(), lang, true) + " " + lc.Text(l10n.KeyLeft)
 		}
 		lines = append(lines, DetailLine{lc.Text(l10n.KeyCredit) + " " + strconv.Itoa(i+1), CreditStatusText(lc, cr.Status) + " · " + expiry})
@@ -301,7 +299,13 @@ func (s *Service) sessionsViewLocked(v *CodexView) {
 		v.RecentSessionLines = []DetailLine{{lc.Text(l10n.KeyError), s.recentErr}}
 		return
 	}
-	for i, it := range s.recent {
+	v.RecentSessionLines = recentSessionLines(lc, s.recent)
+}
+
+// recentSessionLines renders the recent sessions rows, newest first.
+func recentSessionLines(lc l10n.Localizer, items []sessions.Item) []DetailLine {
+	var lines []DetailLine
+	for i, it := range items {
 		if i >= defaultRecentSessions {
 			break
 		}
@@ -309,9 +313,10 @@ func (s *Service) sessionsViewLocked(v *CodexView) {
 		if it.EstimatedUSD != nil {
 			amount = moneyJSON(*it.EstimatedUSD)
 		}
-		v.RecentSessionLines = append(v.RecentSessionLines, DetailLine{it.ProjectName,
+		lines = append(lines, DetailLine{it.ProjectName,
 			sessionStateText(lc, it.State) + " · " + CompactNumber(int64(it.Totals.TotalTokens)) + " " + lc.Text(l10n.KeyTokens) + " · " + amount})
 	}
+	return lines
 }
 
 func moneyJSON(d swiftjson.Decimal) string { return "$" + fmt.Sprintf("%.4f", d.Float64()) }

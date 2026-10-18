@@ -101,7 +101,7 @@ func settleSkills(t *testing.T, tt *ui.Tester, queue chan func(), n int) {
 
 func TestSettingsSkillsTabFollowsNotificationsInItsOwnGroup(t *testing.T) {
 	i := slices.Index(settingsTabs, tabSkills)
-	if i <= 0 || settingsTabs[i-1] != tabNotifications || settingsTabs[i+1] != tabAdvanced {
+	if i <= 0 || settingsTabs[i-1] != tabRemote || settingsTabs[i+1] != tabAdvanced {
 		t.Fatalf("tabs = %v", settingsTabs)
 	}
 	if !sidebarGroupStarts[tabSkills] || !sidebarGroupStarts[tabAdvanced] {

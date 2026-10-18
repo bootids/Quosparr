@@ -10,8 +10,8 @@ import (
 
 func TestKeyCount(t *testing.T) {
 	// Pinned so that adding or dropping a key is a deliberate change.
-	if got := len(allKeys); got != 640 {
-		t.Errorf("len(allKeys) = %d, want 640", got)
+	if got := len(allKeys); got != 661 {
+		t.Errorf("len(allKeys) = %d, want 661", got)
 	}
 	seen := map[Key]bool{}
 	for _, k := range allKeys {
@@ -101,8 +101,8 @@ func TestPlaceholdersConsistentAcrossLanguages(t *testing.T) {
 			}
 		}
 	}
-	if formatted != 40 {
-		t.Errorf("formatted keys = %d, want 40 (update if Swift strings change)", formatted)
+	if formatted != 42 {
+		t.Errorf("formatted keys = %d, want 42 (update if Swift strings change)", formatted)
 	}
 }
 

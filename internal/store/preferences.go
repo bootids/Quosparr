@@ -119,6 +119,9 @@ type Preferences struct {
 	// PanelProviders is Go-only: the providers the main panel offers, in
 	// Providers() order. Empty shows every provider and is not written.
 	PanelProviders []Provider `json:"panelProviders,omitempty"`
+	// RemoteSource is Go-only: the global local/remote data-source switch,
+	// nil while unset or at its default.
+	RemoteSource *RemoteSource `json:"remoteSource,omitempty"`
 
 	// extra holds keys this version does not know, written back unchanged so
 	// that older and newer apps sharing the domain do not erase each other's
@@ -175,6 +178,10 @@ func (p Preferences) Clone() Preferences {
 	p.MainPanelModuleOrder = slices.Clone(p.MainPanelModuleOrder)
 	p.StatusBarProviders = slices.Clone(p.StatusBarProviders)
 	p.FloatingWindow = p.FloatingWindow.clone()
+	if p.RemoteSource != nil {
+		rs := p.RemoteSource.clone()
+		p.RemoteSource = &rs
+	}
 	p.PanelProviders = slices.Clone(p.PanelProviders)
 	p.extra = maps.Clone(p.extra)
 	return p

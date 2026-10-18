@@ -9,7 +9,6 @@ import (
 	"github.com/licoy/quosparr/internal/apiquota"
 	"github.com/licoy/quosparr/internal/codex"
 	"github.com/licoy/quosparr/internal/netx"
-	"github.com/licoy/quosparr/internal/usage"
 )
 
 // openAIBaseURL is where a plain API key (no relay) lists its models.
@@ -35,7 +34,7 @@ func (rt *liveApp) addCodexAPIAccount(ctx context.Context, in CodexAPIInput) err
 	if err != nil {
 		return err
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	rt.awaitCodexBalance(ctx, acc)
 	return nil
 }
@@ -63,13 +62,13 @@ func (rt *liveApp) updateCodexAPIAccount(ctx context.Context, id string, in Code
 	}
 	edit := codex.RelayEdit{Profile: codex.RelayProfile{BaseURL: in.BaseURL, Model: in.Model}, Key: in.APIKey, Apply: in.Apply}
 	saved, err := rt.codex.EditRelayAccount(id, edit, time.Now())
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	if err != nil {
 		return err
 	}
 	if in.Apply && strings.TrimSpace(in.APIKey) != "" {
 		// The shown login changed under the service.
-		rt.svc.Refresh(usage.RefreshForce)
+		rt.fullRefresh()
 	}
 	if saved.APIQuota == nil {
 		rt.awaitCodexBalance(ctx, saved)
@@ -84,7 +83,7 @@ func (rt *liveApp) awaitCodexBalance(ctx context.Context, acc codex.ManagedAccou
 		return
 	}
 	select {
-	case <-rt.svc.RefreshAccountQuota(acc.ID):
+	case <-rt.refreshAccountQuota(acc.ID):
 	case <-ctx.Done():
 	}
 }

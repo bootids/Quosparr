@@ -13,6 +13,11 @@ import (
 // calls them off the main thread. The confirmations of the Swift sheets are
 // the panel's own popovers, so none of these asks again.
 func installAccountActions(rt *liveApp, s *Settings, a *PanelActions) {
+	// Remote mode renders remote data only; every account writer stays nil
+	// and its control disabled with the read-only note.
+	if rt.remoteMode() {
+		return
+	}
 	loc := func() l10n.Localizer {
 		if s != nil {
 			return s.L()
@@ -20,8 +25,8 @@ func installAccountActions(rt *liveApp, s *Settings, a *PanelActions) {
 		return l10n.ForPreference(string(rt.svc.Preferences().Language), rt.langs)
 	}
 	a.Accounts = AccountActions{
-		RefreshAll: func() string { <-rt.svc.RefreshAllAccountQuotas(); return "" },
-		Refresh:    func(id string) string { <-rt.svc.RefreshAccountQuota(id); return "" },
+		RefreshAll: func() string { rt.refreshAllAccountQuotas(); return "" },
+		Refresh:    func(id string) string { <-rt.refreshAccountQuota(id); return "" },
 		Switch:     func(id string, restart bool) string { return rtSwitchCodex(loc(), id, restart) },
 		Delete:     func(id string) string { return rt.removeCodexAccount(loc(), id) },
 	}
@@ -43,7 +48,7 @@ func (rt *liveApp) removeCodexAccount(l l10n.Localizer, id string) string {
 	if err := rt.codex.DeleteAccount(id); err != nil {
 		return l.Text(l10n.KeyStatusError)
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	return ""
 }
 

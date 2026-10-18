@@ -35,6 +35,10 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		ui.Text(c, l.Text(l10n.KeyNotLoaded)).FontSize(12).TextColor(c.Theme().TextMuted)
 		return
 	}
+	if rt.remoteMode() {
+		renderRemoteAccountsPage(c, u, f, rt)
+		return
+	}
 	switch f.kind {
 	case accountKindCodex:
 		renderCodexAccounts(c, u, f, rt)
@@ -42,6 +46,67 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		renderGrokAccounts(c, u, f, rt)
 	default:
 		renderClaudeAccounts(c, u, f, rt)
+	}
+}
+
+// renderRemoteAccountsPage is the remote-mode accounts page: the accounts
+// the remote status file lists, read-only, with no toolbar and no actions.
+func renderRemoteAccountsPage(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {
+	l := u.L()
+	t := c.Theme()
+	snap := rt.svc.Snapshot()
+	ui.Column(c).Gap(4).Padding(12).Radius(12).Background(t.Danger.Alpha(0.10)).Children(func() {
+		ui.Text(c, l.Text(l10n.KeyRemoteReadOnly)).FontSize(13).FontWeight(600).TextColor(t.Danger)
+		ui.Text(c, l.Text(l10n.KeyRemoteReadOnlyNote)).FontSize(11).TextColor(t.TextMuted)
+	})
+	priv := u.s.Prefs().AccountPrivacyModeEnabled
+	var rows []codex.ManagedAccount
+	switch f.kind {
+	case accountKindGrok:
+		rows = snap.Grok.Accounts.Sidebar
+	case accountKindClaude:
+		rows = snap.Claude.Accounts.Sidebar
+	default:
+		rows = snap.Accounts.Sidebar
+	}
+	if len(rows) == 0 {
+		ui.Text(c, l.Text(l10n.KeyAccountsEmpty)).FontSize(12).TextColor(t.TextMuted)
+		return
+	}
+	accountRows(c, len(rows), func(i int) {
+		acc := rows[i]
+		name := acc.ResolvedDisplayName()
+		if priv {
+			name = codex.MaskAccountText(name)
+		}
+		ui.Row(c).Gap(10).Padding(10, 0).AlignItems(ui.Center).Children(func() {
+			ProviderIcon(c, accountKindProvider(f.kind), 20)
+			if acc.ID == remoteActiveID(snap, f.kind) {
+				ui.Text(c, l.Text(l10n.KeyAccountsCurrent)).FontSize(11).TextColor(t.TextMuted)
+			}
+		})
+	})
+}
+
+func accountKindProvider(kind int) store.Provider {
+	switch kind {
+	case accountKindGrok:
+		return store.ProviderGrok
+	case accountKindClaude:
+		return store.ProviderClaude
+	default:
+		return store.ProviderCodex
+	}
+}
+
+func remoteActiveID(snap runway.Snapshot, kind int) string {
+	switch kind {
+	case accountKindGrok:
+		return snap.Grok.Accounts.ActiveID
+	case accountKindClaude:
+		return snap.Claude.Accounts.ActiveID
+	default:
+		return snap.Accounts.ActiveID
 	}
 }
 
@@ -255,7 +320,7 @@ func renderCodexAccounts(c *ui.Context, u *settingsUI, f *accountForm, rt *liveA
 		f.selection = exportAccountSelection(rows)
 		return ""
 	}, func() string {
-		<-rt.svc.RefreshAllAccountQuotas()
+		rt.refreshAllAccountQuotas()
 		return ""
 	})
 	accountEditor(c, u, f)
@@ -397,7 +462,7 @@ func renderCodexSettingsRow(c *ui.Context, u *settingsUI, f *accountForm, rt *li
 		accountSettingsIdentity(c, l, accountIdentityView{account: acc, current: current, privacy: priv, provider: store.ProviderCodex})
 		if IconButton(c, icRefresh, l.Text(l10n.KeyRefresh), f.busy || rt == nil).Clicked() {
 			id := acc.ID
-			u.accountAct(f, "", func() string { <-rt.svc.RefreshAccountQuota(id); return "" })
+			u.accountAct(f, "", func() string { <-rt.refreshAccountQuota(id); return "" })
 		}
 		ui.MenuButton(c, l.Text(l10n.KeyAccountsActions), func(m *ui.Menu) {
 			if m.Item(l.Text(l10n.KeyAccountsMakeCurrent)).Disabled(current).Chosen() {
@@ -516,13 +581,13 @@ func (rt *liveApp) importCodexOfficial(l l10n.Localizer) string {
 		}
 		return l.Text(l10n.KeyAccountsImportFailed)
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	return l.Textf(l10n.KeyAccountsImportSucceeded, 1)
 }
 
 func (rt *liveApp) pasteCodex(l l10n.Localizer, text string) (string, bool) {
 	batch := (&codex.Importer{Store: rt.codex}).ImportPastedText(context.Background(), text, false)
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	if len(batch.Succeeded) == 0 {
 		return l.Text(l10n.KeyAccountsImportNoCredentials), false
 	}
@@ -535,7 +600,7 @@ func (rt *liveApp) importCodexFiles(l l10n.Localizer) string {
 		return ""
 	}
 	batch := (&codex.Importer{Store: rt.codex}).ImportFiles(context.Background(), paths, false)
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	if len(batch.Succeeded) == 0 {
 		return l.Text(l10n.KeyAccountsImportFailed)
 	}
@@ -575,7 +640,7 @@ func (rt *liveApp) setCodexMeta(l l10n.Localizer, id string, alias, note *string
 	if err := rt.codex.UpdateMetadata(acc); err != nil {
 		return l.Text(l10n.KeyAccountsImportFailed)
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	return ""
 }
 
@@ -591,7 +656,7 @@ func (rt *liveApp) moveCodex(id string, dir int) string {
 	if err := rt.codex.Reorder(next); err != nil {
 		return accountError(rt)
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	return ""
 }
 
@@ -603,7 +668,7 @@ func (rt *liveApp) switchCodex(l l10n.Localizer, id, name string) string {
 	if !confirmed {
 		return ""
 	}
-	if err := rt.svc.SwitchAccount(context.Background(), id); err != nil {
+	if err := rt.switchAccount(context.Background(), id); err != nil {
 		return l.Text(l10n.KeyAccountsSwitchFailed)
 	}
 	return ""
@@ -620,7 +685,7 @@ func (rt *liveApp) deleteCodex(l l10n.Localizer, id string) string {
 	if err := rt.codex.DeleteAccount(id); err != nil {
 		return l.Text(l10n.KeyStatusError)
 	}
-	rt.svc.ReloadAccounts()
+	rt.reloadAccounts()
 	return ""
 }
 

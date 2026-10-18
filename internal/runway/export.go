@@ -103,7 +103,33 @@ func (s *Service) statusSnapshotLocked(now time.Time) export.StatusSnapshot {
 	}
 	items := append([]sessions.Item{}, s.recent...)
 	out.Sessions = &sessions.Summary{Items: items}
+	out.Providers = statusExportProviders(s.buildLocked(now))
 	return out
+}
+
+// statusExportProviders is the provider block of status.json: the same
+// snapshots the widget shows, copied without the widget's model-specific quota
+// filtering (each row carries its source; readers filter). Codex always says
+// something (at least its availability) so remote readers can tell a
+// not-logged-in provider from an absent one; the other blocks are omitted
+// when the state has no widget snapshot.
+func statusExportProviders(snap Snapshot) *export.StatusProviders {
+	var p export.StatusProviders
+	c := codexWidgetProvider(snap.Codex)
+	p.Codex = &c
+	if snap.Grok.Widget != nil {
+		w := *snap.Grok.Widget
+		p.Grok = &w
+	}
+	if snap.Claude.Widget != nil {
+		w := *snap.Claude.Widget
+		p.Claude = &w
+	}
+	if snap.ResetToday.Widget != nil {
+		r := *snap.ResetToday.Widget
+		p.ResetToday = &r
+	}
+	return &p
 }
 
 // exportStatusLocked writes status.json when the preference is on. The file

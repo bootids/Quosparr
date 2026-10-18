@@ -20,11 +20,21 @@ var errSkillsUnavailable = errors.New("skills service unavailable")
 // moves to that trash (the system Trash from another volume); purging
 // moves on to the system Trash, so nothing is erased.
 func installSkillActions(rt *liveApp, a *SkillActions) {
+	a.Query = rt.querySkills
+	a.ReadBody = skills.ReadBody
+	a.OpenFolder = mygo.Shell.OpenPath
+	a.Reveal = mygo.Shell.ShowItemInFolder
+	a.Copy = mygo.Clipboard.WriteText
+	a.Inspect = skills.Inspect
+	// Remote mode keeps the skills page read-only: enabling, deleting,
+	// restoring and emptying the trash all write the local config and stay
+	// disabled.
+	if rt.remoteMode() {
+		return
+	}
 	home := rt.skillsEnv().Home
 	trash := skills.NewTrash(platform.RunwayDir(home), home)
 	system := mygo.Shell.TrashItem
-	a.Query = rt.querySkills
-	a.ReadBody = skills.ReadBody
 	a.SetEnabled = rt.setSkillEnabled
 	a.Delete = func(s skills.Skill, roots []skills.RootInfo) (bool, error) {
 		_, inSystem, err := trash.MoveSkill(s, roots, time.Now(), system)
@@ -34,10 +44,6 @@ func installSkillActions(rt *liveApp, a *SkillActions) {
 		_, inSystem, err := trash.MoveBrokenLink(sum, path, time.Now(), system)
 		return inSystem, err
 	}
-	a.OpenFolder = mygo.Shell.OpenPath
-	a.Reveal = mygo.Shell.ShowItemInFolder
-	a.Copy = mygo.Clipboard.WriteText
-	a.Inspect = skills.Inspect
 	a.TrashDir = trash.Dir
 	a.ListTrash = trash.List
 	a.Restore = trash.Restore

@@ -158,7 +158,7 @@ func TestAccountsPageMasksAndDropsThePlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Match the account command path: publish the changed index before drawing.
-	rt.svc.ReloadAccounts()
+	rt.localService().ReloadAccounts()
 	u, tt := openSettingsView(t, e, tabAccounts)
 	e.s.SetAccountPrivacyMode(true)
 	tt.Frame()

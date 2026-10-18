@@ -40,10 +40,11 @@ v1 已正式发布（`v1.0.0`、`v1.0.1`）；macOS 仅保留 Swift WidgetKit �
 - Claude 会话扫描只读 `projects/**`，不写不删，不读取 `last-prompt` 等用户原文。
 - Skill 管理只扫描全局级别（不含项目级与旧版 Claude `commands/*.md`），按各 CLI 自身的发现规则读取 SKILL.md 的 frontmatter，正文只在用户展开时读取前 256 KB，不跟随指向凭据文件的链接；删除仅限用户 skills 目录，删除前重新校验路径、类型与所属根目录，先移入 Quosparr 自有回收站 `~/.quosparr/skills-trash/<id>/`（目录私有，`meta.json` 为 `0600`，只含非密钥元数据与 `item/` 原件），可在设置中原位恢复（恢复前再次校验原父目录与根目录、不覆盖已有内容），彻底删除与清空经系统回收站移除，跨卷无法移入时直接退到系统回收站并单独提示，不得直接删除或递归删除，符号链接只移除链接本身；来源识别只读 `~/.agents/.skill-lock.json`、skill 所在 git 仓库的配置、插件清单与 frontmatter，仓库 URL 去除凭据后才展示；系统、bundled、管理员、插件与 claude.ai 同步目录只读；启停只在用户主动操作时写各家官方开关：Codex `config.toml` 的 `[[skills.config]]`（按 SKILL.md 路径）、Claude `settings.json` 的 `skillOverrides`、Grok `config.toml` 的 `[skills].disabled`，写入前分别备份为 `~/.quosparr/backups` 下的 `codex-config-`、`claude-settings-`、`grok-config-`（各保留最近 10 份），只做逐项编辑并保留其他内容
 - 调用 `/usr/bin/security` 使用绝对路径。密钥只经 stdin 传递，超过上限时报错，不退回 argv。stderr 进入日志前只保留退出码和错误类别。
+- 远程查看模式（偏好 `remoteSource`，Go 版独有、默认省略）是只读镜像：仅经系统 `ssh` 二进制（`BatchMode=yes` 非交互、key/agent/系统 ssh config 认证，无内置 SSH 库）周期拉取远端 `~/.quosparr/status.json`（含 `providers` 块的 Widget 同源派生摘要，非密钥）；远程模式下不创建本地 codex/grok/claude 采集、usage 仓与账号库，切号、登录/导入、token 刷新、会话修复、Skill 启停/删除等写操作一律禁用并明示只读；不保存也不解析 SSH 私钥或口令，拉取错误只携带主机与退出码类别，不含远端 stdout/stderr/文件内容；远端路径拼入远端命令前必须 shell 安全引用；`status.json` 的 `providers` 块字段上限为现有 `ProviderSnapshot`/`ResetTodaySnapshot`，不得加入凭据、邮箱或 token
 
 ## 代码约定
 
-- Go 入口为 `main.go`，原生 UI 与系统协调放在 `internal/app`，后台协调放在 `internal/runway`，存储 / 平台 / 网络 / 本地化边界分别放在 `internal/store`、`internal/platform`、`internal/netx`、`internal/l10n`
+- Go 入口为 `main.go`，原生 UI 与系统协调放在 `internal/app`，后台协调放在 `internal/runway`，存储 / 平台 / 网络 / 本地化 / SSH 远程拉取边界分别放在 `internal/store`、`internal/platform`、`internal/netx`、`internal/l10n`、`internal/remote`
 - Go 业务模块放在 `internal/codex`、`internal/codexapi`、`internal/grok`、`internal/claude`、`internal/usage`、`internal/sessions`、`internal/alerts`、`internal/estimate`、`internal/export`、`internal/resettoday`、`internal/skills`（全局 skill 扫描、来源识别、目录详情与自有回收站，启停写入在各供应商包）；UI 经业务 API 读取结果，不直接解析 JSON 或扫描文件
 - 用户可见文案通过 `internal/l10n`（手工维护的 `tables.go`）与现有附加文案入口，新增 key 必须补齐英文、简体中文、繁体中文、韩文、日文、俄文、法文
 - Widget 使用自带的 `Sources/QuosparrWidget/RunwayWidgetL10n.swift` 与快照类型副本，修改共享 key 或快照 schema 时与 Go 侧保持同步，同样遵守七语言完整性

@@ -125,6 +125,7 @@ type StatusSnapshot struct {
 	Quota       *StatusQuota      `json:"quota,omitempty"`
 	Cost        *CostSummary      `json:"cost,omitempty"`
 	Sessions    *sessions.Summary `json:"sessions,omitempty"`
+	Providers   *StatusProviders  `json:"providers,omitempty"`
 }
 
 // StatusExporter writes status.json.

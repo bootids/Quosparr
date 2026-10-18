@@ -108,7 +108,9 @@ func (rt *liveApp) drainPreferences() {
 			rt.applyPreferences(*p)
 		}
 		if provider != nil {
-			rt.svc.SelectProvider(*provider)
+			if ls := rt.localService(); ls != nil {
+				ls.SelectProvider(*provider)
+			}
 		}
 		w.mu.Lock()
 		newer := w.pending != nil || w.provider != nil
@@ -128,24 +130,34 @@ func (rt *liveApp) drainPreferences() {
 			continue
 		}
 		if repair {
-			rt.svc.RepairSessions()
+			if ls := rt.localService(); ls != nil {
+				ls.RepairSessions()
+			}
 		}
-		if refresh {
-			rt.svc.Refresh(usage.RefreshForce)
+		if rt.remoteSvc != nil {
+			if refresh {
+				<-rt.remoteSvc.Refresh()
+			}
+		} else if refresh {
+			rt.localService().Refresh(usage.RefreshForce)
 			// The public reset feed has its own refresh cycle; a full account
 			// refresh must not consume a queued panel-open/manual feed request.
 			if sections[runway.SectionResetToday] {
-				refreshSection(rt.svc, runway.SectionResetToday)
+				refreshSection(rt.localService(), runway.SectionResetToday)
 			}
 		} else {
 			for section := range sections {
-				refreshSection(rt.svc, section)
+				refreshSection(rt.localService(), section)
 			}
 		}
 	}
 }
 
 func (rt *liveApp) applyPreferences(p store.Preferences) {
+	if rt.remoteSvc != nil {
+		rt.remoteSvc.SetPreferences(p)
+		return
+	}
 	if reflect.DeepEqual(rt.svc.Preferences(), p) {
 		return
 	}
@@ -154,7 +166,7 @@ func (rt *liveApp) applyPreferences(p store.Preferences) {
 		rt.claudeB.setPreferences(p, rt.langs)
 	}
 	rt.reset.setPreferences(p, rt.langs)
-	rt.svc.SetPreferences(p)
+	rt.localService().SetPreferences(p)
 }
 
 func (rt *liveApp) closePreferences() {

@@ -95,7 +95,7 @@ func (u *settingsUI) startCodexLoginFlow(f *accountForm, rt *liveApp, flow codex
 		if err != nil {
 			return codexLoginFailure(l, err)
 		}
-		rt.svc.ReloadAccounts()
+		rt.reloadAccounts()
 		return l.Textf(l10n.KeyAccountsImportSucceeded, 1)
 	})
 }

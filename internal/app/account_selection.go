@@ -164,7 +164,7 @@ func (rt *liveApp) commitAccountSelection(l l10n.Localizer, s *accountSelection,
 	if kind == accountKindCodex {
 		batch := (&codex.Importer{Store: rt.codex}).ImportPreviewSelection(context.Background(), s.codex, ids, false)
 		count, failed = len(batch.Succeeded), len(batch.Failures) > 0
-		rt.svc.ReloadAccounts()
+		rt.reloadAccounts()
 	} else {
 		batch, _, err := rt.grokMod.ImportPreviewSelection(context.Background(), s.grok, ids)
 		count, failed = batch.SuccessCount(), err != nil || len(batch.Failures) > 0

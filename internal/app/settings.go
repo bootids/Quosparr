@@ -542,6 +542,12 @@ func (s *Settings) SetExportsStatusJSON(on bool) bool {
 	return s.Update(func(p *store.Preferences) { p.ExportsStatusJSON = on })
 }
 
+// SetRemoteSource stores the data-source switch. The caller validates the
+// draft first; switching the source takes effect after a restart.
+func (s *Settings) SetRemoteSource(v *store.RemoteSource) bool {
+	return s.Update(func(p *store.Preferences) { p.RemoteSource = v })
+}
+
 // SetAutomaticUpdateChecks turns the automatic update check on or off and
 // tells the updater.
 func (s *Settings) SetAutomaticUpdateChecks(on bool) bool {

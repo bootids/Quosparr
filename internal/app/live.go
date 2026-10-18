@@ -64,8 +64,9 @@ func StartBackground(ctx context.Context, opts BackgroundOptions) func() {
 	}
 }
 
-// LiveService is the running coordinator, or nil before it starts.
-func LiveService() *runway.Service {
+// LiveService is the running coordinator, or nil before it starts. It is
+// the local runway.Service or the remote-mode serviceRuntime.
+func LiveService() serviceRuntime {
 	liveMu.Lock()
 	defer liveMu.Unlock()
 	if liveRT == nil {
@@ -165,7 +166,10 @@ func OpenFolder(path string) { openFolder(path) }
 
 type liveApp struct {
 	preferenceWork livePreferenceWork
-	svc            *runway.Service
+	// svc serves both modes; localSvc and remoteSvc say which.
+	svc            serviceRuntime
+	localSvc       *runway.Service
+	remoteSvc      *remoteRuntime
 	codex          *codex.Store
 	grokMod        *grok.Module
 	grok           *grokBridge
@@ -204,6 +208,9 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 	prefs := store.DefaultPreferences()
 	if opts.Settings != nil {
 		prefs = opts.Settings.Prefs()
+	}
+	if remoteEnabled(prefs) {
+		return newRemoteRuntime(opts, prefs, langs)
 	}
 	codexStore := codex.NewStore(platform.CodexDir(home), platform.RunwayDir(home))
 	// NewStore is the constructor; grok has no Open.
@@ -272,7 +279,7 @@ func newRuntime(opts BackgroundOptions) *liveApp {
 		SystemLanguages: langs,
 	})
 	rt := &liveApp{
-		svc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset,
+		svc: svc, localSvc: svc, codex: codexStore, grokMod: mod, grok: bridge, claudeMod: cmod, claudeB: cbridge, reset: reset,
 		repo: repo, widgets: widgets, dispatch: dispatch, widgetDispatch: widgetUI, alertDispatch: alertUI, version: opts.Version, langs: langs,
 	}
 	widgets.onRequirements = svc.SetWidgetRequirements
@@ -310,6 +317,9 @@ func (rt *liveApp) pushPreferences(s *Settings) {
 }
 
 func (rt *liveApp) panelActions(s *Settings) PanelActions {
+	if rt.remoteMode() {
+		return rt.remotePanelActions(s)
+	}
 	svc := rt.svc
 	actions := PanelActions{
 		Refresh:        func() { rt.requestRefresh(s, "") },

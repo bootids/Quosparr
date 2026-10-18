@@ -92,7 +92,7 @@ func rtSwitchCodexResult(l l10n.Localizer, id string, restartAfter bool) (string
 	if restartAfter {
 		restart = restartCodexDesktop
 	}
-	err := switchAndRestartCodex(func() error { return rt.svc.SwitchAccount(context.Background(), id) }, restart)
+	err := switchAndRestartCodex(func() error { return rt.switchAccount(context.Background(), id) }, restart)
 	if errors.Is(err, errRestartCodex) {
 		return l.Textf(l10n.KeyAccountsRestartCodexFailed, l.Text(l10n.KeyStatusError)), false
 	}

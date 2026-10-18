@@ -1,0 +1,108 @@
+{
+  "generatedAt" : "2026-10-18T09:00:00Z",
+  "sessions" : {
+    "items" : [
+      {
+        "id" : "sess-1",
+        "title" : "Fix lexer",
+        "projectName" : "tools",
+        "updatedAt" : "2026-10-18T08:40:12Z",
+        "totals" : {
+          "totalTokens" : 12000,
+          "uncachedInputTokens" : 4000,
+          "cachedInputTokens" : 6000,
+          "state" : "recent",
+          "turns" : 6,
+          "threads" : 1
+        },
+        "estimatedUSD" : 0.42
+      }
+    ]
+  },
+  "providers" : {
+    "codex" : {
+      "provider" : "codex",
+      "availability" : "available",
+      "plan" : "plus",
+      "updatedAt" : "2026-10-18T08:59:00Z",
+      "quota" : [
+        {
+          "title" : "5 hours",
+          "windowMinutes" : 300,
+          "source" : "standard",
+          "usedPercent" : 40,
+          "remainingPercent" : 60,
+          "resetsAt" : "2026-10-18T11:30:00Z"
+        },
+        {
+          "title" : "gpt-5.1-codex",
+          "source" : "modelSpecific",
+          "usedPercent" : 10,
+          "remainingPercent" : 90
+        }
+      ],
+      "balanceUSD" : 1.25,
+      "tokenSource" : "allDevices",
+      "dailyTokens" : [
+        {
+          "date" : "2026-10-17",
+          "tokens" : 12000
+        },
+        {
+          "date" : "2026-10-18",
+          "tokens" : 3400
+        }
+      ],
+      "resetCredits" : {
+        "availableCount" : 3,
+        "expiringCount" : 1
+      }
+    },
+    "grok" : {
+      "provider" : "grok",
+      "availability" : "available",
+      "plan" : "heavy",
+      "quota" : [
+        {
+          "title" : "7 days",
+          "windowMinutes" : 10080,
+          "source" : "standard",
+          "usedPercent" : 25,
+          "remainingPercent" : 75
+        }
+      ],
+      "tokenSource" : "thisMac",
+      "dailyTokens" : [
+
+      ]
+    },
+    "claude" : {
+      "provider" : "claude",
+      "availability" : "available",
+      "quota" : [
+        {
+          "title" : "5 hours",
+          "windowMinutes" : 300,
+          "source" : "standard",
+          "usedPercent" : 80,
+          "remainingPercent" : 20,
+          "resetsAt" : "2026-10-18T10:15:00Z"
+        }
+      ],
+      "tokenSource" : "thisMac",
+      "dailyTokens" : [
+
+      ]
+    },
+    "resetToday" : {
+      "state" : "no",
+      "fetchedAt" : "2026-10-18T08:55:00Z",
+      "timeline" : [
+        {
+          "effectiveAt" : "2026-10-18T08:55:00Z",
+          "reason" : "none"
+        }
+      ]
+    }
+  }
+}

@@ -85,6 +85,7 @@ func readPreferences(r *reader) Preferences {
 	p.ShowsSkills = r.bool("showsSkills", p.ShowsSkills)
 	p.FloatingWindow = readFloatingWindow(r, "floatingWindow")
 	p.PanelProviders = readPanelProviders(r, "panelProviders")
+	p.RemoteSource = readRemoteSource(r, "remoteSource")
 	return p
 }
 
@@ -112,6 +113,11 @@ func (p Preferences) Validate() error {
 	for _, c := range checks {
 		if !c.ok {
 			return fmt.Errorf("preferences: invalid value for %q", c.key)
+		}
+	}
+	if p.RemoteSource != nil {
+		if err := p.RemoteSource.validate(); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -144,6 +150,9 @@ func (p Preferences) omitGoOnlyDefaults(m fields) {
 	}
 	if p.ShowsSkills {
 		delete(m, "showsSkills")
+	}
+	if p.RemoteSource == nil || p.RemoteSource.isZero() {
+		delete(m, "remoteSource")
 	}
 	order := wireModuleOrder(p.MainPanelModuleOrder)
 	if len(order) == len(p.MainPanelModuleOrder) {
