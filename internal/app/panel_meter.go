@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/licoy/quosparr/internal/deepseek"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/runway"
 	"github.com/licoy/quosparr/internal/speed"
 	"github.com/licoy/quosparr/internal/store"
+	"github.com/licoy/quosparr/internal/zai"
 )
 
 // quotaOnlyProvider reports whether p is one of the quota-only providers
@@ -25,6 +27,19 @@ func quotaOnlyProvider(p store.Provider) bool {
 	return false
 }
 
+// peakPricing reports whether the provider meters usage at its peak rate at
+// now. Only Z.ai and DeepSeek publish peak/off-peak pricing; the window is a
+// property of the vendor's schedule, not of the machine's time zone.
+func peakPricing(p store.Provider, now time.Time) bool {
+	switch p {
+	case store.ProviderZai:
+		return zai.PeakPricing(now)
+	case store.ProviderDeepSeek:
+		return deepseek.PeakPricing(now)
+	}
+	return false
+}
+
 // panelMeterQuota is the quota section of a quota-only provider: the plan,
 // the meter rows and the usage detail, or the empty state (not configured,
 // loading, error). In remote mode the state arrives from the remote path the
@@ -32,7 +47,7 @@ func quotaOnlyProvider(p store.Provider) bool {
 func panelMeterQuota(c *ui.Context, l l10n.Localizer, snap runway.Snapshot, provider store.Provider, acts PanelActions, first *bool, st *panelState, rs resetSwitch) {
 	ms := snap.Meters[provider]
 	refreshing := sectionRefreshing(snap, runway.SectionQuota)
-	spec := sectionSpec{title: l.Text(providerKey(provider)), refreshing: refreshing, refresh: sectionRefresh(acts, runway.SectionQuota)}
+	spec := sectionSpec{title: l.Text(providerKey(provider)), refreshing: refreshing, peak: peakPricing(provider, time.Now()), refresh: sectionRefresh(acts, runway.SectionQuota)}
 	sectionBlock(c, first, func() {
 		drawSectionHead(c, l, st, spec)
 		switch ms.Availability {

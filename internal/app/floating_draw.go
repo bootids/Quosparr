@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/licoy/quosparr/internal/runway"
@@ -15,17 +16,17 @@ import (
 
 // floatingInk are the colors of one appearance.
 type floatingInk struct {
-	bg, border, text, muted, track ui.Color
-	dark                           bool
+	bg, border, text, muted, track, danger ui.Color
+	dark                                   bool
 }
 
 func floatingInkFor(t *ui.Theme) floatingInk {
 	if t.Dark {
 		return floatingInk{bg: ui.Hex("#1F1F21"), border: ui.RGBA(255, 255, 255, 0.12), text: ui.Hex("#F5F5F7"),
-			muted: ui.RGBA(235, 235, 245, 0.6), track: ui.RGBA(255, 255, 255, 0.14), dark: true}
+			muted: ui.RGBA(235, 235, 245, 0.6), track: ui.RGBA(255, 255, 255, 0.14), danger: t.Danger, dark: true}
 	}
 	return floatingInk{bg: ui.Hex("#FFFFFF"), border: ui.RGBA(0, 0, 0, 0.1), text: ui.Hex("#1D1D1F"),
-		muted: ui.RGBA(60, 60, 67, 0.62), track: ui.RGBA(0, 0, 0, 0.09)}
+		muted: ui.RGBA(60, 60, 67, 0.62), track: ui.RGBA(0, 0, 0, 0.09), danger: t.Danger}
 }
 
 // level is the health color as a fill; as text on a light card it is
@@ -270,7 +271,11 @@ func drawCard(p *ui.Painter, r ui.Rect, v runway.FloatingView, k floatingInk, fa
 		}
 		cy := y + cardHeaderH/2
 		floatingProviderIcon(p, item.Provider, ui.Rect{X: x, Y: cy - 7, W: 14, H: 14}, k)
-		floatingText(p, item.Name, floatingFont(12.5, 600, family), x+20, cy, w-20, k.text)
+		nameFont, nameColor := floatingFont(12.5, 600, family), k.text
+		if peakPricing(item.Provider, time.Now()) {
+			nameFont.Weight, nameColor = 700, k.danger
+		}
+		floatingText(p, item.Name, nameFont, x+20, cy, w-20, nameColor)
 		y += cardHeaderH
 		if len(item.Meters) == 0 {
 			floatingText(p, item.Status, floatingFont(12, 500, family), x, y+cardRowH/2-2, w, k.muted)

@@ -33,6 +33,9 @@ type sectionSpec struct {
 	info       *sectionInfo
 	// trailing draws extra controls before the info and refresh buttons.
 	trailing func()
+	// peak marks the header of a provider whose peak pricing window is
+	// active right now: the title gains weight and takes the danger color.
+	peak bool
 }
 
 // sectionInfo is the (i) button of a header and the popover it opens.
@@ -48,7 +51,10 @@ type sectionInfo struct {
 func drawSectionHead(c *ui.Context, l l10n.Localizer, st *panelState, h sectionSpec) {
 	t := c.Theme()
 	ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, h.title).FontSize(fsHeadline).FontWeight(600).Grow(1).Basis(0)
+		title := ui.Text(c, h.title).FontSize(fsHeadline).FontWeight(600).Grow(1).Basis(0)
+		if h.peak {
+			title.FontWeight(700).TextColor(t.Danger)
+		}
 		if h.caption != "" {
 			ui.Text(c, h.caption).FontSize(fsCaption).TextColor(inkSecondary(t)).SingleLine()
 		}
