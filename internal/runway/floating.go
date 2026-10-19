@@ -42,7 +42,11 @@ func BuildFloating(lc l10n.Localizer, in StatusInputs) FloatingView {
 	var v FloatingView
 	for _, p := range in.Prefs.FloatingSelection() {
 		item := FloatingProvider{Provider: p, Name: lc.Text(providerStatusKey(p))}
-		for _, m := range floatingMeters(metersOf(in, p), preferredOf(p)) {
+		meters := metersOf(in, p)
+		if p == store.ProviderAgy {
+			meters = agyFloatingMeters(meters)
+		}
+		for _, m := range floatingMeters(meters, preferredOf(p)) {
 			fm := FloatingMeter{Label: meterTitle(lc, m), RemainingPercent: m.RemainingPercent, Health: m.Health, ValueText: m.ValueText}
 			if m.HasReset() {
 				fm.Reset = DurationLocalized(m.ResetsAt.Sub(in.Now).Seconds(), lc.Language(), false)
@@ -50,11 +54,38 @@ func BuildFloating(lc l10n.Localizer, in StatusInputs) FloatingView {
 			item.Meters = append(item.Meters, fm)
 		}
 		if len(item.Meters) == 0 {
-			item.Status = floatingStatus(lc, in, p)
+			if b := in.Meters[p].BalanceText; b != "" {
+				// A ready provider with only balances (deepseek) shows its
+				// money instead of the unknown placeholder.
+				item.Status = b
+			} else {
+				item.Status = floatingStatus(lc, in, p)
+			}
 		}
 		v.Providers = append(v.Providers, item)
 	}
 	return v
+}
+
+// agyGeminiGroup is the Antigravity group the floating window follows: the
+// CLI's native Gemini quota, exactly as the agy usage JSON names it.
+const agyGeminiGroup = "Gemini Models"
+
+// agyFloatingMeters keeps only the Gemini Models pools — the floating window
+// shows the Gemini 5-hour and weekly windows, not the other-models group. A
+// CLI output without that group keeps every pool so the window never goes
+// blank.
+func agyFloatingMeters(meters []Meter) []Meter {
+	var gemini []Meter
+	for _, m := range meters {
+		if m.Group == agyGeminiGroup {
+			gemini = append(gemini, m)
+		}
+	}
+	if len(gemini) == 0 {
+		return meters
+	}
+	return gemini
 }
 
 // floatingMeters picks up to two standard windows, the preferred lengths

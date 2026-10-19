@@ -66,6 +66,7 @@ func meterPanelBlock(m MeterState) export.MeterPanelBlock {
 	for _, d := range m.Detail {
 		b.Detail = append(b.Detail, export.PanelDetailLine{Title: d.Title, Value: d.Value})
 	}
+	b.BalanceText = m.BalanceText
 	for _, r := range m.Rates {
 		b.Rates = append(b.Rates, export.MeterPanelRate{
 			ID: r.ID, Title: r.Title, Unit: r.Unit, IsPercent: r.IsPercent,

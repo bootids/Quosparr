@@ -89,3 +89,79 @@ func TestFloatingWithOnlyModelSpecificWindowShowsIt(t *testing.T) {
 		t.Errorf("no meters = %+v", got)
 	}
 }
+
+// The floating window follows the Gemini Models group only: its 5-hour and
+// weekly windows, never the other-models group (which previously produced a
+// second "5h" row).
+func TestFloatingAgyShowsOnlyTheGeminiWindows(t *testing.T) {
+	geminiWeekly := testMeter("Weekly Limit Remaining", 25, WeeklyMinutes, SourceStandard)
+	geminiWeekly.Group = agyGeminiGroup
+	geminiFive := testMeter("Five Hour Limit Remaining", 4, FiveHourMinutes, SourceStandard)
+	geminiFive.Group = agyGeminiGroup
+	otherWeekly := testMeter("Weekly Limit Remaining", 0, WeeklyMinutes, SourceStandard)
+	otherWeekly.Group = "Claude and GPT models"
+	otherFive := testMeter("Five Hour Limit Remaining", 0, FiveHourMinutes, SourceStandard)
+	otherFive.Group = "Claude and GPT models"
+	p := store.DefaultPreferences()
+	p.FloatingWindow.Providers = []store.Provider{store.ProviderAgy}
+	v := BuildFloating(zh, StatusInputs{
+		Prefs: p, Now: time.Now(),
+		Meters: map[store.Provider]MeterState{store.ProviderAgy: {Availability: MeterReady,
+			Meters: []Meter{geminiWeekly, geminiFive, otherWeekly, otherFive}}},
+	})
+	if len(v.Providers) != 1 || v.Providers[0].Provider != store.ProviderAgy {
+		t.Fatalf("providers = %+v", v.Providers)
+	}
+	item := v.Providers[0]
+	if len(item.Meters) != 2 {
+		t.Fatalf("meters = %+v, want exactly the two Gemini windows", item.Meters)
+	}
+	// 5-hour first, then weekly, both from the Gemini group (used 4% and 25%,
+	// not the untouched other-models pools at 100%).
+	if item.Meters[0].Label != zh.Text(l10n.KeyFiveHourUsage) || item.Meters[0].RemainingPercent != 96 {
+		t.Errorf("first meter = %+v, want the Gemini 5-hour window", item.Meters[0])
+	}
+	if item.Meters[1].Label != zh.Text(l10n.KeyWeeklyUsage) || item.Meters[1].RemainingPercent != 75 {
+		t.Errorf("second meter = %+v, want the Gemini weekly window", item.Meters[1])
+	}
+	if item.Status != "" {
+		t.Errorf("status = %q, want none with meters present", item.Status)
+	}
+}
+
+// A CLI output without the Gemini group keeps every pool: the window must not
+// go blank over a renamed group.
+func TestFloatingAgyWithoutGeminiGroupKeepsEveryPool(t *testing.T) {
+	five := testMeter("Five Hour Limit Remaining", 10, FiveHourMinutes, SourceStandard)
+	five.Group = "Renamed group"
+	p := store.DefaultPreferences()
+	p.FloatingWindow.Providers = []store.Provider{store.ProviderAgy}
+	v := BuildFloating(zh, StatusInputs{
+		Prefs: p, Now: time.Now(),
+		Meters: map[store.Provider]MeterState{store.ProviderAgy: {Availability: MeterReady, Meters: []Meter{five}}},
+	})
+	if len(v.Providers) != 1 || len(v.Providers[0].Meters) != 1 || v.Providers[0].Meters[0].RemainingPercent != 90 {
+		t.Fatalf("providers = %+v", v.Providers)
+	}
+}
+
+// DeepSeek has balances but no quota pools; its floating item shows the money
+// instead of the unknown placeholder.
+func TestFloatingBalanceOnlyProviderShowsBalanceText(t *testing.T) {
+	p := store.DefaultPreferences()
+	p.FloatingWindow.Providers = []store.Provider{store.ProviderDeepSeek}
+	v := BuildFloating(zh, StatusInputs{
+		Prefs: p, Now: time.Now(),
+		Meters: map[store.Provider]MeterState{store.ProviderDeepSeek: {
+			Availability: MeterReady, BalanceText: "110 CNY · 12.5 USD",
+			Detail: []DetailLine{{Title: "Balance (CNY)", Value: "110"}},
+		}},
+	})
+	if len(v.Providers) != 1 || v.Providers[0].Provider != store.ProviderDeepSeek {
+		t.Fatalf("providers = %+v", v.Providers)
+	}
+	item := v.Providers[0]
+	if len(item.Meters) != 0 || item.Status != "110 CNY · 12.5 USD" {
+		t.Fatalf("item = %+v, want the balance text as the status", item)
+	}
+}

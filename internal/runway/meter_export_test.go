@@ -329,3 +329,29 @@ func TestPanelMeterGroupFieldsRoundTrip(t *testing.T) {
 		t.Fatalf("remote row = %+v", m)
 	}
 }
+
+// The compact balance summary of a pool-less provider survives export and the
+// remote rebuild, so the remote floating window shows it too.
+func TestPanelMeterBalanceTextRoundTrip(t *testing.T) {
+	snap := Snapshot{Meters: map[store.Provider]MeterState{
+		store.ProviderDeepSeek: {Availability: MeterReady, BalanceText: "110 CNY · 12.5 USD", FetchedAt: t0},
+	}}
+	p := statusExportPanel(snap)
+	b, ok := p.Meters["deepseek"]
+	if !ok || b.BalanceText != "110 CNY · 12.5 USD" {
+		t.Fatalf("panel block = %+v", p.Meters["deepseek"])
+	}
+	data, err := swiftjson.Marshal(p, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back export.StatusPanel
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatal(err)
+	}
+	remote := BuildRemoteSnapshot(export.StatusSnapshot{Panel: &back}, testPrefs(), en, t0)
+	ms, ok := remote.Meters[store.ProviderDeepSeek]
+	if !ok || ms.BalanceText != "110 CNY · 12.5 USD" {
+		t.Fatalf("remote balance text = %+v", remote.Meters[store.ProviderDeepSeek])
+	}
+}

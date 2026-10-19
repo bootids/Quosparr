@@ -37,6 +37,9 @@ type MeterPanelBlock struct {
 	Plan         string            `json:"plan,omitempty"`
 	Meters       []WidgetQuota     `json:"meters,omitempty"`
 	Detail       []PanelDetailLine `json:"detail,omitempty"`
+	// BalanceText is the compact prepaid-balance summary of a provider with
+	// no quota pools; the remote floating window shows it as its status.
+	BalanceText string `json:"balanceText,omitempty"`
 	Rates        []MeterPanelRate  `json:"rates,omitempty"`
 	Speed        *PanelSpeedReport `json:"speed,omitempty"`
 	FetchedAt    *time.Time        `json:"fetchedAt,omitempty"`

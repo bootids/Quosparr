@@ -122,9 +122,11 @@ func TestMeterLimitMetersCarryValueText(t *testing.T) {
 	rows := meterLimitMeters(enLocalizer(), []meter.Limit{
 		{ID: "cost", Title: "Cost", Unit: "usd", WindowMinutes: meter.MonthlyMinutes, Used: 3.5, LimitValue: 20, Percent: 17.5, HasPercent: true},
 		{ID: "credits", Title: "Credits", Unit: "credits", Used: 12, LimitValue: 30},
+		{ID: "5h", Title: "5h", Unit: "", WindowMinutes: meter.FiveHourMinutes, Used: 0, LimitValue: 100, Percent: 0, HasPercent: true},
+		{ID: "7d", Title: "7d", Unit: "", WindowMinutes: meter.WeeklyMinutes, Used: 7, LimitValue: 100, Percent: 7, HasPercent: true},
 		{ID: "wk", Title: "7d", Unit: "percent", WindowMinutes: meter.WeeklyMinutes, Percent: 62.5, HasPercent: true},
 	}, now)
-	if len(rows) != 3 {
+	if len(rows) != 5 {
 		t.Fatalf("rows = %+v", rows)
 	}
 	if rows[0].ValueText != "$3.5 / $20" || rows[0].UsedPercent != 18 {
@@ -133,11 +135,14 @@ func TestMeterLimitMetersCarryValueText(t *testing.T) {
 	if rows[1].ValueText != "12 / 30" || rows[1].UsedPercent != 0 {
 		t.Fatalf("credits row = %+v", rows[1])
 	}
+	if rows[2].ValueText != "" || rows[2].RemainingPercent != 100 || rows[3].ValueText != "" || rows[3].RemainingPercent != 93 {
+		t.Fatalf("count rows with a percentage = %+v %+v, want no value text so captions show the percentage", rows[2], rows[3])
+	}
 	if rows[0].Title != "Cost" {
 		t.Fatalf("pool identity title = %q, want Cost", rows[0].Title)
 	}
-	if rows[2].Title != enLocalizer().Text(l10n.KeyWeeklyUsage) {
-		t.Fatalf("bare window title = %q", rows[2].Title)
+	if rows[4].Title != enLocalizer().Text(l10n.KeyWeeklyUsage) {
+		t.Fatalf("bare window title = %q", rows[4].Title)
 	}
 }
 
@@ -292,11 +297,17 @@ func TestMeterModulesDeepSeekConfiguredKeyDetected(t *testing.T) {
 	}
 	st := meterStateFromRaw(enLocalizer(), meter.State{
 		Status:    meter.StatusOK,
-		Balances:  []meter.Balance{{Currency: "CNY", Total: 110, Granted: 10, ToppedUp: 100}},
+		Balances: []meter.Balance{
+			{Currency: "CNY", Total: 110, Granted: 10, ToppedUp: 100},
+			{Currency: "USD", Total: 12.5, Granted: 2.5, ToppedUp: 10},
+		},
 		FetchedAt: time.Now(),
 	}, true, time.Now())
-	if st.Availability != runway.MeterReady || len(st.Detail) != 1 ||
+	if st.Availability != runway.MeterReady || len(st.Detail) != 2 ||
 		!strings.Contains(st.Detail[0].Title, "CNY") || !strings.HasPrefix(st.Detail[0].Value, "110") {
 		t.Fatalf("deepseek balance state = %+v", st)
+	}
+	if st.BalanceText != "110 CNY · 12.5 USD" {
+		t.Fatalf("balance text = %q, want the compact multi-currency summary", st.BalanceText)
 	}
 }

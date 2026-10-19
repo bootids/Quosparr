@@ -195,8 +195,28 @@ func meterStateFromRaw(lc l10n.Localizer, raw meter.State, loaded bool, now time
 	}
 	if len(raw.Balances) > 0 {
 		st.Detail = append(st.Detail, meterBalanceLines(lc, raw.Balances)...)
+		if len(st.Meters) == 0 {
+			st.BalanceText = meterBalanceSummary(raw.Balances)
+		}
 	}
 	return st
+}
+
+// meterBalanceSummary is the compact floating-window summary of the prepaid
+// balances: "110 CNY · 12.5 USD". Amounts are data, not UI copy.
+func meterBalanceSummary(balances []meter.Balance) string {
+	parts := make([]string, 0, len(balances))
+	for _, b := range balances {
+		if math.IsNaN(b.Total) {
+			continue
+		}
+		s := meterAmount(b.Total)
+		if b.Currency != "" {
+			s += " " + b.Currency
+		}
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // meterBalanceLines renders prepaid balance rows as detail lines: the total
@@ -225,7 +245,8 @@ func meterBalanceLines(lc l10n.Localizer, balances []meter.Balance) []runway.Det
 }
 
 // meterLimitMeters turns the normalized quota pools into panel meters.
-// Percent pools carry a bar; amount pools carry their value as text.
+// Percent pools carry a bar and show their percentage on every surface;
+// money pools and amount pools without a percentage carry their value as text.
 func meterLimitMeters(lc l10n.Localizer, limits []meter.Limit, now time.Time) []runway.Meter {
 	rows := make([]runway.Meter, 0, len(limits))
 	for _, l := range limits {
@@ -240,7 +261,10 @@ func meterLimitMeters(lc l10n.Localizer, limits []meter.Limit, now time.Time) []
 		if remaining := 100 - l.Percent; l.HasPercent && remaining != math.Trunc(remaining) {
 			m.RemainingCaption = meterAmount(remaining)
 		}
-		if text := meterValueText(l); text != "" {
+		// Count pools with a percentage (kimi counts, zai credits) show the
+		// percentage everywhere, as the panel rows do; the caption stays on
+		// money pools (cursor plan cost) and pools without a percentage.
+		if text := meterValueText(l); text != "" && (l.Unit == "usd" || !l.HasPercent) {
 			m.ValueText = text
 		}
 		rows = append(rows, m)

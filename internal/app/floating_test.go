@@ -1,15 +1,21 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/licoy/quosparr/internal/agy"
 	"github.com/licoy/quosparr/internal/l10n"
+	"github.com/licoy/quosparr/internal/meter"
+	"github.com/licoy/quosparr/internal/runway"
 	"github.com/licoy/quosparr/internal/store"
 )
 
@@ -77,6 +83,88 @@ func TestFloatingTooltipNamesEveryMeter(t *testing.T) {
 	for _, want := range []string{"Codex", "Claude", "73%", "41%", "18%", "64%"} {
 		if !strings.Contains(tip, want) {
 			t.Errorf("tooltip %q misses %q", tip, want)
+		}
+	}
+}
+
+// The real agy pipeline — fake CLI binary, agy.Fetch, the meter mapping and
+// BuildFloating — lands on the Gemini Models 5-hour and weekly windows in the
+// floating view, never on a second 5-hour row of the other-models group.
+func TestFloatingAgyPipelineShowsGeminiWindows(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"command":{"data":{"groups":[
+		{"name":"Gemini Models","buckets":[
+			{"id":"gemini-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":0.9925113320350647},
+			{"id":"gemini-5h","name":"Five Hour Limit Remaining","window":"5h","remaining_fraction":0.9606873989105225}]},
+		{"name":"Claude and GPT models","buckets":[
+			{"id":"3p-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":1},
+			{"id":"3p-5h","name":"Five Hour Limit Remaining","window":"5h","remaining_fraction":1}]}]}}}`
+	bin := filepath.Join(dir, "agy")
+	if runtime.GOOS == "windows" {
+		bin = filepath.Join(dir, "agy.cmd")
+		if err := os.WriteFile(bin, []byte("@echo off\r\necho "+body+"\r\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	} else if err := os.WriteFile(bin, []byte("#!/bin/sh\ncat <<'EOF'\n"+body+"\nEOF\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	l := enLocalizer()
+	raw := agy.Fetch(context.Background(), bin, now)
+	if raw.Status != meter.StatusOK {
+		t.Fatalf("fetch = %+v", raw)
+	}
+	prefs := store.DefaultPreferences()
+	prefs.FloatingWindow.Providers = []store.Provider{store.ProviderAgy}
+	v := runway.BuildFloating(l, runway.StatusInputs{
+		Prefs: prefs, Now: now,
+		Meters: map[store.Provider]runway.MeterState{
+			store.ProviderAgy: meterStateFromRaw(l, raw, true, now),
+		},
+	})
+	if len(v.Providers) != 1 || len(v.Providers[0].Meters) != 2 {
+		t.Fatalf("view = %+v", v)
+	}
+	item := v.Providers[0]
+	if item.Meters[0].Label != l.Text(l10n.KeyFiveHourUsage) || item.Meters[0].RemainingPercent != 96 {
+		t.Errorf("first meter = %+v, want the Gemini 5-hour window at 96%%", item.Meters[0])
+	}
+	if item.Meters[1].Label != l.Text(l10n.KeyWeeklyUsage) || item.Meters[1].RemainingPercent != 99 {
+		t.Errorf("second meter = %+v, want the Gemini weekly window at 99%%", item.Meters[1])
+	}
+	if item.Status != "" {
+		t.Errorf("status = %q, want none with meters present", item.Status)
+	}
+}
+
+// The kimi pipeline keeps its raw counts (they feed the rate sampling), but a
+// count pool that carries a percentage must surface the percentage in the
+// floating window, exactly like the panel rows — never a "0 / 100" caption.
+func TestFloatingKimiCountPoolsShowPercent(t *testing.T) {
+	now := time.Now()
+	l := enLocalizer()
+	raw := meter.State{Status: meter.StatusOK, FetchedAt: now, Limits: []meter.Limit{
+		{ID: "5h", Unit: "", WindowMinutes: meter.FiveHourMinutes, Used: 0, LimitValue: 100, Percent: 0, HasPercent: true},
+		{ID: "7d", Unit: "", WindowMinutes: meter.WeeklyMinutes, Used: 7, LimitValue: 100, Percent: 7, HasPercent: true},
+	}}
+	prefs := store.DefaultPreferences()
+	prefs.FloatingWindow.Providers = []store.Provider{store.ProviderKimi}
+	v := runway.BuildFloating(l, runway.StatusInputs{
+		Prefs: prefs, Now: now,
+		Meters: map[store.Provider]runway.MeterState{
+			store.ProviderKimi: meterStateFromRaw(l, raw, true, now),
+		},
+	})
+	if len(v.Providers) != 1 || len(v.Providers[0].Meters) != 2 {
+		t.Fatalf("view = %+v", v)
+	}
+	for i, want := range []string{"100%", "93%"} {
+		m := v.Providers[0].Meters[i]
+		if m.ValueText != "" {
+			t.Errorf("meter %d carries value text %q, want the percentage", i, m.ValueText)
+		}
+		if got := percentText(m); got != want {
+			t.Errorf("meter %d caption = %q, want %q", i, got, want)
 		}
 	}
 }

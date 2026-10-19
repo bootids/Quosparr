@@ -244,6 +244,10 @@ type MeterState struct {
 	Plan   string
 	Meters []Meter
 	Detail []DetailLine
+	// BalanceText is the compact prepaid-balance summary ("110 CNY · 12.5
+	// USD") of a provider whose state carries balances but no quota pools
+	// (deepseek); the floating window shows it instead of the placeholder.
+	BalanceText string
 	// FetchedAt is the last successful fetch (zero when never).
 	FetchedAt time.Time
 	// Rates is the per-pool consumption-rate analysis; empty when the

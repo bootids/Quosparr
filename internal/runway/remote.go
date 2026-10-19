@@ -624,7 +624,7 @@ func remoteMeterStates(panel *export.StatusPanel, prefs store.Preferences, lc l1
 		ms := MeterState{
 			Availability: remoteMeterAvailability(b.Availability), Plan: b.Plan,
 			Meters: widgetMeters(lc, b.Meters, prefs, now), Detail: remoteDetailLines(b.Detail),
-			FetchedAt: derefTime(b.FetchedAt),
+			BalanceText: b.BalanceText, FetchedAt: derefTime(b.FetchedAt),
 		}
 		for _, r := range b.Rates {
 			ms.Rates = append(ms.Rates, MeterRate{
