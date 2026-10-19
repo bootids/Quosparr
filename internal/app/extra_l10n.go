@@ -61,6 +61,10 @@ const (
 	xFloatingLockedHint               textKey = "floatingWindowLockedDescription"
 	xFloatingFullScreen               textKey = "floatingWindowOverFullScreen"
 	xFloatingFullScreenHint           textKey = "floatingWindowOverFullScreenDescription"
+	xFloatingEdgeHide                 textKey = "floatingWindowEdgeHide"
+	xFloatingEdgeHideHint             textKey = "floatingWindowEdgeHideDescription"
+	xFloatingEdgeSnap                 textKey = "floatingWindowEdgeSnap"
+	xFloatingEdgeReveal               textKey = "floatingWindowEdgeReveal"
 	xFloatingHide                     textKey = "floatingWindowHide"
 	xFloatingWayland                  textKey = "floatingWindowWayland"
 	xFloatingAppFilter                textKey = "floatingWindowAppFilter"
@@ -269,6 +273,24 @@ var extraTexts = map[textKey][7]string{
 		"オフのときは、ほかのアプリがフルスクリーンの間フローティングウインドウを隠します",
 		"Если выключено, плавающее окно скрывается, пока другое приложение в полноэкранном режиме",
 		"Désactivé, la fenêtre flottante s’efface tant qu’une autre app est en plein écran",
+	},
+	xFloatingEdgeHide: {
+		"Hide at screen edge", "吸附屏幕边缘隐藏", "吸附螢幕邊緣隱藏", "화면 가장자리에 붙여 숨기기", "画面の端に吸着して隠す", "Прятать у края экрана", "Masquer au bord de l’écran",
+	},
+	xFloatingEdgeHideHint: {
+		"When on, dropping the floating window near the left or right edge docks it there and hides it; moving the pointer near that edge shows it again",
+		"开启后，将悬浮窗拖到屏幕左缘或右缘附近即吸附并隐藏，鼠标靠近该边缘时重新显示",
+		"開啟後，將浮動視窗拖到螢幕左緣或右緣附近即吸附並隱藏，滑鼠靠近該邊緣時重新顯示",
+		"켜면 플로팅 창을 화면 왼쪽 또는 오른쪽 가장자리 근처에 놓을 때 붙어서 숨겨지고, 포인터를 그 가장자리에 가까이 하면 다시 나타납니다",
+		"オンにすると、フローティングウインドウを画面の左端または右端の近くでドロップするとそこに吸着して隠れ、ポインタをその端に近づけると再表示されます",
+		"Если включено, плавающее окно, отпущенное у левого или правого края экрана, пристаёт к нему и скрывается; указатель рядом с этим краем снова его показывает",
+		"Si activé, la fenêtre flottante lâchée près du bord gauche ou droit s’y aimante et se masque ; approcher le pointeur de ce bord l’affiche de nouveau",
+	},
+	xFloatingEdgeSnap: {
+		"Snap range", "吸附范围", "吸附範圍", "흡착 범위", "吸着範囲", "Зона пристания", "Zone d’aimantation",
+	},
+	xFloatingEdgeReveal: {
+		"Reveal range", "显示范围", "顯示範圍", "표시 범위", "表示範囲", "Зона показа", "Zone d’affichage",
 	},
 	xFloatingHide: {
 		"Hide floating window", "隐藏悬浮窗", "隱藏浮動視窗", "플로팅 창 숨기기", "フローティングウインドウを隠す", "Скрыть плавающее окно", "Masquer la fenêtre flottante",

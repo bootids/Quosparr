@@ -296,7 +296,7 @@ func TestMeterModulesDeepSeekConfiguredKeyDetected(t *testing.T) {
 		t.Fatal("detect(deepseek) = false with an explicit key")
 	}
 	st := meterStateFromRaw(enLocalizer(), meter.State{
-		Status:    meter.StatusOK,
+		Status: meter.StatusOK,
 		Balances: []meter.Balance{
 			{Currency: "CNY", Total: 110, Granted: 10, ToppedUp: 100},
 			{Currency: "USD", Total: 12.5, Granted: 2.5, ToppedUp: 10},

@@ -56,17 +56,17 @@ type Rate struct {
 	IsPercent       bool // PerHour/AtReset are percentage points, not amount units
 	// IsBalance marks a prepaid-balance pool: PerHour is the spend rate of
 	// the total and ExhaustsAt is its depletion projection.
-	IsBalance    bool
-	PerHour      float64
-	HasRate      bool // slope of the current (post-reset) segment
-	Samples      int  // samples in the segment used
-	From, To     time.Time
-	ExhaustsAt   time.Time
-	HasExhaust   bool
-	ResetsAt     time.Time
-	HasReset     bool
-	AtReset      float64
-	HasAtReset   bool
+	IsBalance  bool
+	PerHour    float64
+	HasRate    bool // slope of the current (post-reset) segment
+	Samples    int  // samples in the segment used
+	From, To   time.Time
+	ExhaustsAt time.Time
+	HasExhaust bool
+	ResetsAt   time.Time
+	HasReset   bool
+	AtReset    float64
+	HasAtReset bool
 }
 
 type poolFile struct {
@@ -296,16 +296,16 @@ func analyzePool(id string, pf *poolFile, _ time.Time) Rate {
 	latest := samples[len(samples)-1]
 	balance := pf.Meta.Balance
 	r := Rate{
-		ID:         id,
-		Title:      pf.Meta.Title,
-		Unit:       pf.Meta.Unit,
-		IsPercent:  !latest.HasUsed && latest.HasPercent,
-		IsBalance:  balance,
-		Samples:    1,
-		From:       latest.At,
-		To:         latest.At,
-		HasReset:   latest.HasReset,
-		ResetsAt:   latest.ResetsAt,
+		ID:        id,
+		Title:     pf.Meta.Title,
+		Unit:      pf.Meta.Unit,
+		IsPercent: !latest.HasUsed && latest.HasPercent,
+		IsBalance: balance,
+		Samples:   1,
+		From:      latest.At,
+		To:        latest.At,
+		HasReset:  latest.HasReset,
+		ResetsAt:  latest.ResetsAt,
 	}
 	if !latest.HasUsed && !latest.HasPercent {
 		return r

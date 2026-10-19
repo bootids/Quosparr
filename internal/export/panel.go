@@ -39,11 +39,11 @@ type MeterPanelBlock struct {
 	Detail       []PanelDetailLine `json:"detail,omitempty"`
 	// BalanceText is the compact prepaid-balance summary of a provider with
 	// no quota pools; the remote floating window shows it as its status.
-	BalanceText string `json:"balanceText,omitempty"`
-	Rates        []MeterPanelRate  `json:"rates,omitempty"`
-	Speed        *PanelSpeedReport `json:"speed,omitempty"`
-	FetchedAt    *time.Time        `json:"fetchedAt,omitempty"`
-	Error        string            `json:"error,omitempty"`
+	BalanceText string            `json:"balanceText,omitempty"`
+	Rates       []MeterPanelRate  `json:"rates,omitempty"`
+	Speed       *PanelSpeedReport `json:"speed,omitempty"`
+	FetchedAt   *time.Time        `json:"fetchedAt,omitempty"`
+	Error       string            `json:"error,omitempty"`
 }
 
 // MeterPanelRate mirrors one pool's consumption-rate analysis (the runway

@@ -28,6 +28,8 @@ const (
 // Windows, so the card fills it and Windows 11 rounds its corners.
 func floatingTransparent() bool { return false }
 
+func setFloatingOpacity(win *mygo.Window, v float64) { win.SetOpacity(v) }
+
 func setupFloatingWindow(win *mygo.Window, _ bool) {
 	hwnd := win.NativeHandle()
 	if hwnd == 0 || procDwmSetWindowAttribute.Find() != nil {
@@ -73,3 +75,6 @@ func watchFullScreen(report func(bool)) func() {
 	}()
 	return func() { close(stop) }
 }
+
+// fadeFloatingOpacityNative: no native fade here; the ticker path runs.
+func fadeFloatingOpacityNative(*mygo.Window, float64) bool { return false }

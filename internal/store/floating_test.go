@@ -43,6 +43,12 @@ func TestFloatingWindowDecodesLeniently(t *testing.T) {
 			AppFilter: FloatingAppFilterAllow, Apps: []FloatingApp{{ID: "a", Name: "A"}, {ID: "b"}},
 		},
 		`{"apps":[]}`: {},
+		`{"edgeHide":true,"edgeSide":"left","edgeSnap":99,"edgeReveal":1}`: {EdgeHide: true, EdgeSide: FloatingEdgeLeft, EdgeSnap: 64, EdgeReveal: 2},
+		`{"edgeHide":true,"edgeSide":"bogus"}`:                             {EdgeHide: true},
+		`{"edgeSide":"left"}`:                                              {},
+		`{"edgeHide":false,"edgeSide":"right"}`:                            {},
+		`{"edgeHide":true,"edgeSnap":3,"edgeReveal":100}`:                  {EdgeHide: true, EdgeSnap: MinFloatingEdgeSnap, EdgeReveal: MaxFloatingEdgeReveal},
+		`{"edgeHide":true,"edgeSnap":16,"edgeReveal":8}`:                   {EdgeHide: true},
 	} {
 		if got := mustDecode(t, `{"floatingWindow":`+raw+`}`).FloatingWindow; !reflect.DeepEqual(got, want) {
 			t.Errorf("floatingWindow %s decoded to %+v, want %+v", raw, got, want)
@@ -78,5 +84,36 @@ func TestFloatingAppsAreCappedAndCloned(t *testing.T) {
 	c.Apps[0].ID = "changed"
 	if f.Apps[0].ID == "changed" || !f.HasApp(f.Apps[1].ID) || f.HasApp("changed") {
 		t.Errorf("clone shares the apps: %v", f.Apps[0])
+	}
+}
+
+func TestFloatingEdgeHideEncodesAndDefaults(t *testing.T) {
+	var f FloatingWindow
+	if got := f.EdgeSnapPx(); got != DefaultFloatingEdgeSnap {
+		t.Errorf("default snap = %d, want %d", got, DefaultFloatingEdgeSnap)
+	}
+	if got := f.EdgeRevealPx(); got != DefaultFloatingEdgeReveal {
+		t.Errorf("default reveal = %d, want %d", got, DefaultFloatingEdgeReveal)
+	}
+	p := DefaultPreferences()
+	p.FloatingWindow = FloatingWindow{Enabled: true, EdgeHide: true}
+	enc, err := EncodePreferences(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"edgeSide", "edgeSnap", "edgeReveal"} {
+		if strings.Contains(string(enc), `"`+key+`"`) {
+			t.Errorf("%s is written: %s", key, enc)
+		}
+	}
+	if !strings.Contains(string(enc), `"edgeHide":true`) {
+		t.Errorf("edgeHide is not written: %s", enc)
+	}
+	p.FloatingWindow = FloatingWindow{EdgeHide: true, EdgeSide: FloatingEdgeRight, EdgeSnap: 32, EdgeReveal: 4}
+	if enc, err = EncodePreferences(p); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustDecode(t, string(enc)).FloatingWindow; !reflect.DeepEqual(got, p.FloatingWindow) {
+		t.Errorf("round trip = %+v, want %+v", got, p.FloatingWindow)
 	}
 }

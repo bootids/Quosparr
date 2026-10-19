@@ -59,6 +59,28 @@ func (u *settingsUI) floatingPage(c *ui.Context) {
 				set(func(f *store.FloatingWindow) { f.OverFullScreen = v })
 			}
 		})
+		row(tx(l, xFloatingEdgeHide), tx(l, xFloatingEdgeHideHint), func() {
+			if v, ok := toggle(c, "fw-edge", tx(l, xFloatingEdgeHide), f.EdgeHide, ro); ok {
+				set(func(f *store.FloatingWindow) {
+					f.EdgeHide = v
+					if !v {
+						f.EdgeSide = store.FloatingEdgeNone
+					}
+				})
+			}
+		})
+		row(tx(l, xFloatingEdgeSnap), "", func() {
+			if v, ok := choose(c, "fw-edge-snap", tx(l, xFloatingEdgeSnap), f.EdgeSnapPx(), store.FloatingEdgeSnapOptions(),
+				func(v int) string { return strconv.Itoa(v) + " px" }, ro); ok {
+				set(func(f *store.FloatingWindow) { f.EdgeSnap = v })
+			}
+		})
+		row(tx(l, xFloatingEdgeReveal), "", func() {
+			if v, ok := choose(c, "fw-edge-reveal", tx(l, xFloatingEdgeReveal), f.EdgeRevealPx(), store.FloatingEdgeRevealOptions(),
+				func(v int) string { return strconv.Itoa(v) + " px" }, ro); ok {
+				set(func(f *store.FloatingWindow) { f.EdgeReveal = v })
+			}
+		})
 		u.floatingAppRows(c, row, f, ro)
 	})
 }

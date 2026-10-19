@@ -34,6 +34,22 @@ const (
 // FloatingOpacityOptions are the opacities the settings UI offers.
 func FloatingOpacityOptions() []int { return []int{100, 90, 80, 70, 60, 50} }
 
+// Limits of the edge snap and reveal distances, in DIPs.
+const (
+	MinFloatingEdgeSnap       = 4
+	MaxFloatingEdgeSnap       = 64
+	DefaultFloatingEdgeSnap   = 16
+	MinFloatingEdgeReveal     = 2
+	MaxFloatingEdgeReveal     = 48
+	DefaultFloatingEdgeReveal = 8
+)
+
+// FloatingEdgeSnapOptions are the snap distances the settings UI offers.
+func FloatingEdgeSnapOptions() []int { return []int{8, 16, 32, 64} }
+
+// FloatingEdgeRevealOptions are the reveal distances the settings UI offers.
+func FloatingEdgeRevealOptions() []int { return []int{4, 8, 16, 32} }
+
 // FloatingWindow is the desktop floating window. It is Go-only: written as
 // one object, left out while every field is at its default, and an
 // unreadable value is the default.
@@ -51,7 +67,20 @@ type FloatingWindow struct {
 	OverFullScreen bool `json:"overFullScreen,omitempty"`
 	// AppFilter shows or hides the window by the app in front, from Apps.
 	AppFilter FloatingAppFilter `json:"appFilter,omitempty"`
-	Apps      []FloatingApp     `json:"apps,omitempty"`
+	// EdgeHide docks the window at the left or right of the display it is
+	// on when a drag ends within EdgeSnap of that side, hiding it until
+	// the pointer comes within EdgeReveal of the side.
+	EdgeHide bool `json:"edgeHide,omitempty"`
+	// EdgeSide is the side last docked at, kept across restarts; empty
+	// when not docked. Cleared when edge hiding is off.
+	EdgeSide FloatingEdgeSide `json:"edgeSide,omitempty"`
+	// EdgeSnap is how far from a side, in DIPs, a drag ends docked; 0 is
+	// the default.
+	EdgeSnap int `json:"edgeSnap,omitempty"`
+	// EdgeReveal is how close to the docked side the pointer comes to
+	// show the window again, in DIPs; 0 is the default.
+	EdgeReveal int           `json:"edgeReveal,omitempty"`
+	Apps       []FloatingApp `json:"apps,omitempty"`
 }
 
 // FloatingAppFilter is how the app in front shows or hides the floating
@@ -80,6 +109,22 @@ func (v FloatingAppFilter) Valid() bool { return slices.Contains(FloatingAppFilt
 // MaxFloatingApps is how many apps the list keeps.
 const MaxFloatingApps = 64
 
+// FloatingEdgeSide is the screen side the floating window is docked at and
+// hides beside, when edge hiding is on.
+type FloatingEdgeSide string
+
+// FloatingEdgeSide values: none is the empty zero value and is not written.
+const (
+	FloatingEdgeNone  FloatingEdgeSide = ""
+	FloatingEdgeLeft  FloatingEdgeSide = "left"
+	FloatingEdgeRight FloatingEdgeSide = "right"
+)
+
+// Valid reports whether v is a known side.
+func (v FloatingEdgeSide) Valid() bool {
+	return v == FloatingEdgeLeft || v == FloatingEdgeRight
+}
+
 // FloatingApp is an app of the floating window's list. ID is what the system
 // knows it by: its bundle identifier on macOS (or its path), its
 // AppUserModelID, known-folder path or executable on Windows, and its
@@ -95,7 +140,24 @@ func (f FloatingWindow) OpacityPercent() int {
 	if f.Opacity == 0 {
 		return MaxFloatingOpacity
 	}
+
 	return f.Opacity
+}
+
+// EdgeSnapPx is the snap distance in DIPs, DefaultFloatingEdgeSnap for 0.
+func (f FloatingWindow) EdgeSnapPx() int {
+	if f.EdgeSnap == 0 {
+		return DefaultFloatingEdgeSnap
+	}
+	return f.EdgeSnap
+}
+
+// EdgeRevealPx is the reveal distance in DIPs, DefaultFloatingEdgeReveal for 0.
+func (f FloatingWindow) EdgeRevealPx() int {
+	if f.EdgeReveal == 0 {
+		return DefaultFloatingEdgeReveal
+	}
+	return f.EdgeReveal
 }
 
 func (f FloatingWindow) clone() FloatingWindow {
@@ -122,6 +184,24 @@ func (f *FloatingWindow) normalize() {
 	}
 	if !f.AppFilter.Valid() {
 		f.AppFilter = FloatingAppFilterOff
+	}
+	if !f.EdgeSide.Valid() {
+		f.EdgeSide = FloatingEdgeNone
+	}
+	if !f.EdgeHide {
+		f.EdgeSide = FloatingEdgeNone
+	}
+	if f.EdgeSnap != 0 {
+		f.EdgeSnap = max(MinFloatingEdgeSnap, min(MaxFloatingEdgeSnap, f.EdgeSnap))
+	}
+	if f.EdgeSnap == DefaultFloatingEdgeSnap {
+		f.EdgeSnap = 0
+	}
+	if f.EdgeReveal != 0 {
+		f.EdgeReveal = max(MinFloatingEdgeReveal, min(MaxFloatingEdgeReveal, f.EdgeReveal))
+	}
+	if f.EdgeReveal == DefaultFloatingEdgeReveal {
+		f.EdgeReveal = 0
 	}
 	f.Apps = canonicalFloatingApps(f.Apps)
 }

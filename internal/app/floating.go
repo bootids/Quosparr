@@ -34,7 +34,20 @@ type floatingState struct {
 	// followKey is the filter and the apps followed, empty when not.
 	followKey  string
 	stopFollow func()
-	drag       floatingDrag
+	// docked is the side the window is docked at, none when it is not;
+	// dockShown is whether the pointer keeps the docked window shown;
+	// dockAway is that its slide past the edge finished, so it hides at
+	// the OS level; dockKey is what the edge watcher is keyed by, empty
+	// when off.
+	docked       store.FloatingEdgeSide
+	dockShown    bool
+	dockAway     bool
+	dockKey      string
+	stopDock     func()
+	stopDockAnim func()
+	// stopFade stops the dock opacity fade, if one runs.
+	stopFade func()
+	drag     floatingDrag
 }
 
 // floatingDrag moves the window from the cursor's screen position, so a
@@ -84,10 +97,15 @@ func (a *App) syncFloating() {
 		a.setFloatingOverFullScreen(f.OverFullScreen)
 	}
 	a.syncFloatingFollow(f)
+	a.syncFloatingDock(f)
 	if w != a.floating.w || h != a.floating.h {
 		a.resizeFloating(w, h)
 	}
-	win.SetOpacity(float64(f.OpacityPercent()) / 100)
+	// A dock fade owns the opacity while it runs; snapping to the setting
+	// mid-fade would make the appear or vanish look instant.
+	if a.floating.stopFade == nil {
+		setFloatingOpacity(win, float64(f.OpacityPercent())/100)
+	}
 	win.Invalidate()
 }
 
@@ -134,13 +152,18 @@ func (a *App) openFloating(prefs store.Preferences, w, h int) {
 			a.floating = floatingState{}
 		}
 	})
-	a.floating.offDisplays = mygo.Screen.OnDisplaysChanged(a.keepFloatingOnScreen)
-	if a.floating.followKey != "" {
-		// Hidden until the app in front is known.
-		a.floating.appHidden, a.floating.hidden = true, true
+	a.syncFloatingDock(f)
+	a.floating.appHidden = a.floating.followKey != ""
+	if a.floating.appHidden {
+		// Hidden until the follower says otherwise; it was created hidden.
+		a.floating.hidden = true
 		return
 	}
-	win.ShowInactive()
+	// Undocked the window just shows; docked, syncFloatingDock already
+	// hid it at its off-screen place, and showing would flash a sliver.
+	if a.floating.docked == store.FloatingEdgeNone {
+		win.ShowInactive()
+	}
 }
 
 // setFloatingOverFullScreen lets the window show above full-screen apps,
@@ -202,12 +225,112 @@ func (a *App) syncFloatingFollow(f store.FloatingWindow) {
 	})
 }
 
-// showFloatingIfDue hides the window while another app is full screen or the
-// app in front hides it, and shows it again after.
+// syncFloatingDock starts, restarts or stops edge docking as the setting,
+// the side last docked at or the reveal distance change. It runs on the
+// main thread and is cheap on unchanged input.
+func (a *App) syncFloatingDock(f store.FloatingWindow) {
+	key := floatingDockKey(f)
+	if key == a.floating.dockKey {
+		return
+	}
+	a.stopDockWatch()
+	a.stopFloatingDockAnim()
+	a.floating.dockKey = key
+	if key == "" {
+		a.floating.docked = store.FloatingEdgeNone
+		a.floating.dockShown = false
+		a.floating.dockAway = false
+		a.showFloatingIfDue()
+		return
+	}
+	side := f.EdgeSide
+	if !side.Valid() {
+		side = store.FloatingEdgeNone
+	}
+	a.floating.docked = side
+	a.floating.dockShown = false
+	if side != store.FloatingEdgeNone {
+		// Places the window at its off-screen hidden place and hides it.
+		a.slideFloatingDock(false, false)
+		a.startDockWatch(side, f.EdgeRevealPx())
+		return
+	}
+	a.showFloatingIfDue()
+}
+
+// stopDockWatch stops the edge watcher, if one runs.
+func (a *App) stopDockWatch() {
+	if a.floating.stopDock != nil {
+		a.floating.stopDock()
+		a.floating.stopDock = nil
+	}
+}
+
+// startDockWatch reports, on the main thread, whether the pointer keeps the
+// docked window shown: near the docked edge of the work area, or over the
+// window itself while it is shown; it replaces any watcher that ran before.
+func (a *App) startDockWatch(side store.FloatingEdgeSide, reveal int) {
+	a.stopDockWatch()
+	win := a.floating.win
+	if win == nil {
+		return
+	}
+	sample := func() (mygo.Rectangle, mygo.Rectangle) {
+		b := win.Bounds()
+		area := mygo.Screen.DisplayNearestPoint(mygo.Point{X: b.X + b.Width/2, Y: b.Y + b.Height/2}).WorkArea
+		return b, area
+	}
+	a.floating.stopDock = watchDockEdge(side, reveal, a.floating.dockShown, sample, func(near bool) {
+		a.floating.dockShown = near
+		a.slideFloatingDock(near, true)
+	})
+}
+
+// dockFloatingRelease ends a drag with edge hiding on: it docks the window
+// at the side the drag ends near, or just keeps it on screen.
+func (a *App) dockFloatingRelease(f store.FloatingWindow) {
+	win := a.floating.win
+	if win == nil {
+		return
+	}
+	b := win.Bounds()
+	area := mygo.Screen.DisplayNearestPoint(mygo.Point{X: b.X + b.Width/2, Y: b.Y + b.Height/2}).WorkArea
+	side := floatingDockSide(b, area, f.EdgeSnapPx())
+	// The dock state goes in before the preference write: writing runs the
+	// settings listeners, whose syncFloatingDock would see a stale dock
+	// key, hide the just-docked window off-screen and turn the snap below
+	// into a vanish-and-reappear. With the key already set, that sync is
+	// a no-op and the release owns the window.
+	f.EdgeSide = side
+	a.floating.docked, a.floating.dockKey = side, floatingDockKey(f)
+	a.settings.SetFloatingWindow(func(p *store.FloatingWindow) { p.EdgeSide = side })
+	if side == store.FloatingEdgeNone {
+		a.floating.dockShown = false
+		a.floating.dockAway = false
+		a.stopDockWatch()
+		a.stopFloatingDockAnim()
+		a.keepFloatingOnScreen()
+		a.showFloatingIfDue()
+		return
+	}
+	// The pointer is on the window at release, so it stays shown and the
+	// slide snaps it flush to the edge.
+	a.floating.dockShown = true
+	a.floating.dockAway = false
+	a.startDockWatch(side, f.EdgeRevealPx())
+	a.slideFloatingDock(true, true)
+}
+
+// showFloatingIfDue hides the window while another app is full screen, the
+// app in front hides it or its dock slide past the edge finished, and
+// shows it again after; dock slides are driven by their callers instead.
 func (a *App) showFloatingIfDue() {
 	win := a.floating.win
-	hide := a.floating.fullScreenHidden || a.floating.appHidden
-	if win == nil || hide == a.floating.hidden {
+	if win == nil {
+		return
+	}
+	hide := a.floating.fullScreenHidden || a.floating.appHidden || a.floating.dockAway
+	if hide == a.floating.hidden {
 		return
 	}
 	a.floating.hidden = hide
@@ -219,13 +342,18 @@ func (a *App) showFloatingIfDue() {
 }
 
 // resizeFloating fits the window to new content, keeping its vertical
-// center and the edge nearer the side of the display it is on.
+// center and the edge nearer the side of the display it is on; a docked
+// window stays at its docked edge instead.
 func (a *App) resizeFloating(w, h int) {
 	win := a.floating.win
 	b := win.Bounds()
 	area := mygo.Screen.DisplayMatching(b).WorkArea
 	a.floating.w, a.floating.h = w, h
 	win.SetContentSize(w, h)
+	if a.floating.docked != store.FloatingEdgeNone {
+		a.slideFloatingDock(a.floating.dockShown, false)
+		return
+	}
 	nb := win.Bounds()
 	x, y := floatingAnchor(b, nb.Width, nb.Height, area)
 	nb.X, nb.Y = clampFloating(mygo.Rectangle{X: x, Y: y, Width: nb.Width, Height: nb.Height}, area)
@@ -243,6 +371,221 @@ func floatingAnchor(b mygo.Rectangle, w, h int, area mygo.Rectangle) (int, int) 
 	return x, b.Y + (b.Height-h)/2
 }
 
+// animateFloatingDock slides the window's X to x over dockAnimTime, eased
+// cubic out, replacing any slide that runs — a replaced or stopped slide
+// never reports done. It is a no-op without a window or when already at
+// x; done, when set, runs on the main thread after the final position is
+// set, only when the slide finishes naturally.
+func (a *App) animateFloatingDock(x, y int, done func()) {
+	win := a.floating.win
+	if win == nil {
+		return
+	}
+	b := win.Bounds()
+	dx, dy := b.X-x, b.Y-y
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	if dx <= 1 && dy <= 1 {
+		return
+	}
+	a.stopFloatingDockAnim()
+	from, start := b.X, time.Now()
+	stop := make(chan struct{})
+	a.floating.stopDockAnim = func() { close(stop) }
+	go func() {
+		t := time.NewTicker(dockAnimTick)
+		defer t.Stop()
+		for {
+			f := floatingDockEase(float64(time.Since(start)) / float64(dockAnimTime))
+			cx := from + int(float64(x-from)*f)
+			runOnMain(func() {
+				select {
+				case <-stop:
+				default:
+					win.SetPosition(cx, y)
+					if f >= 1 && done != nil {
+						done()
+					}
+				}
+			})
+			if f >= 1 {
+				return
+			}
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+			}
+		}
+	}()
+}
+
+// stopFloatingDockAnim stops the dock slide, if one runs.
+func (a *App) stopFloatingDockAnim() {
+	if a.floating.stopDockAnim != nil {
+		a.floating.stopDockAnim()
+		a.floating.stopDockAnim = nil
+	}
+}
+
+// animateFloatingOpacity fades the window's opacity from from to op over
+// dockAnimTime, eased like the dock slide, replacing any fade that runs.
+// It runs its steps on the main thread, like the dock slide, and is a no-op
+// without a window or when from == op.
+// dockAppearAlpha is where the appear fade starts: not zero, which macOS
+// would drop from compositing and so cancel the fade.
+const dockAppearAlpha = 0.05
+
+func (a *App) animateFloatingOpacity(from, op float64) {
+	win := a.floating.win
+	if win == nil || from == op {
+		return
+	}
+	a.stopFloatingDockFade()
+	stop := make(chan struct{})
+	a.floating.stopFade = func() {
+		close(stop)
+		// Stopping must not write: a fade-out stopped by a reveal would
+		// otherwise post its own zero after the new fade began, leaving
+		// the window stuck invisible.
+	}
+	if fadeFloatingOpacityNative(win, op) {
+		// The platform fades on its own; the settings own the opacity
+		// again once that fade has had its time.
+		time.AfterFunc(dockAnimTime, func() {
+			if a.floating.stopFade != nil {
+				a.floating.stopFade = nil
+			}
+		})
+		return
+	}
+	start := time.Now()
+	go func() {
+		t := time.NewTicker(dockAnimTick)
+		defer t.Stop()
+		for {
+			f := floatingDockEase(float64(time.Since(start)) / float64(dockAnimTime))
+			o := from + (op-from)*f
+			if f >= 1 {
+				o = op
+			}
+			final := f >= 1
+			runOnMain(func() {
+				select {
+				case <-stop:
+				default:
+					setFloatingOpacity(win, o)
+					if final {
+						// The fade is over: the settings own the
+						// opacity again. Main-thread serial access
+						// makes the clear safe next to a replacing
+						// stop, which closes stop first.
+						a.floating.stopFade = nil
+					}
+				}
+			})
+			if final {
+				return
+			}
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+			}
+		}
+	}()
+}
+
+// stopFloatingDockFade stops the dock fade, if one runs, snapping the
+// window to the value the fade was going for.
+func (a *App) stopFloatingDockFade() {
+	if a.floating.stopFade != nil {
+		a.floating.stopFade()
+		a.floating.stopFade = nil
+	}
+}
+
+// slideFloatingDock puts the docked window at its shown or hidden place at
+// the docked edge of the display it is on. Appear and disappear animate
+// through opacity, since macOS moves a window that sits fully off-screen
+// back on screen when shown, so position alone cannot animate the appear
+// there — and that clamp does not place the window flush, so wherever
+// showing moved it, it snaps to the flush place and the fade is the appear
+// (Windows and Linux keep the hidden window fully off-screen, and the
+// position slide brings it in from the docked edge beside the fade). The
+// hidden place slides the window past the edge — macOS keeps a sliver on
+// screen, so the slide ends by hiding the window — and the hide restores
+// the configured opacity while hidden. Without animation everything applies
+// at once. A drag owns the window instead.
+func (a *App) slideFloatingDock(shown, animate bool) {
+	win := a.floating.win
+	if win == nil || a.floating.docked == store.FloatingEdgeNone || a.floating.drag.active {
+		return
+	}
+	b := win.Bounds()
+	area := mygo.Screen.DisplayNearestPoint(mygo.Point{X: b.X + b.Width/2, Y: b.Y + b.Height/2}).WorkArea
+	_, y := clampFloating(b, area)
+	target := floatingDockX(a.floating.docked, area, b.Width, shown)
+	cur := win.Bounds()
+	dx := cur.X - target
+	if dx < 0 {
+		dx = -dx
+	}
+	op := float64(a.settings.Prefs().FloatingWindow.OpacityPercent()) / 100
+	if shown {
+		a.floating.dockAway = false
+		a.stopFloatingDockFade()
+		// The window appears from nearly invisible: macOS clamps a shown
+		// window back on screen, so this fade is the appear animation
+		// there, and a fully zero alpha would drop the window out of
+		// compositing, which cancels the fade; a small start keeps it in
+		// the tree.
+		setFloatingOpacity(win, dockAppearAlpha)
+		a.showFloatingIfDue()
+		// The clamp of a shown window does not place it flush: docked left
+		// it lands inset from the edge, and the leftover slide would then
+		// come in from the wrong side. Where showing moved the window, the
+		// fade at the flush place is the appear; elsewhere (Windows and
+		// Linux keep the hidden window fully off-screen) the slide below
+		// brings it in from the docked edge.
+		if now := win.Bounds(); now.X != cur.X {
+			win.SetPosition(target, y)
+		}
+		a.animateFloatingOpacity(dockAppearAlpha, op)
+		switch {
+		case animate && dx > 1:
+			a.animateFloatingDock(target, y, nil)
+		case cur.X != target || cur.Y != y:
+			win.SetPosition(target, y)
+		}
+		return
+	}
+	// The slide-out may finish after the pointer returns, so the guard
+	// keeps a stale completion from hiding a window shown again.
+	hide := func() {
+		if a.floating.docked != store.FloatingEdgeNone && !a.floating.dockShown {
+			a.floating.dockAway = true
+			a.showFloatingIfDue()
+			setFloatingOpacity(win, op)
+		}
+	}
+	if animate && dx > 1 {
+		a.animateFloatingOpacity(op, 0)
+		a.animateFloatingDock(target, y, hide)
+		return
+	}
+	if cur.X != target || cur.Y != y {
+		win.SetPosition(target, y)
+	}
+	hide()
+	a.stopFloatingDockFade()
+	setFloatingOpacity(win, op)
+}
+
 func (a *App) stopFloatingWatchers() {
 	if a.floating.stopWatch != nil {
 		a.floating.stopWatch()
@@ -250,6 +593,11 @@ func (a *App) stopFloatingWatchers() {
 	if a.floating.stopFollow != nil {
 		a.floating.stopFollow()
 	}
+	if a.floating.stopDock != nil {
+		a.floating.stopDock()
+	}
+	a.stopFloatingDockAnim()
+	a.stopFloatingDockFade()
 	if a.floating.offDisplays != nil {
 		a.floating.offDisplays()
 	}
@@ -280,6 +628,11 @@ func (a *App) floatingFullScreen(busy bool) {
 func (a *App) keepFloatingOnScreen() {
 	win := a.floating.win
 	if win == nil {
+		return
+	}
+	if a.floating.docked != store.FloatingEdgeNone {
+		// A docked window sits at its docked edge, hidden or not.
+		a.slideFloatingDock(a.floating.dockShown, false)
 		return
 	}
 	b := win.Bounds()
@@ -323,7 +676,7 @@ func (a *App) floatingView(c *ui.Context) {
 	// as soon as the pointer gets ahead of the moving window.
 	_, _, held := root.Dragged()
 	clicked := root.Clicked()
-	a.trackFloatingDrag(held, prefs.FloatingWindow.Locked)
+	a.trackFloatingDrag(held, prefs.FloatingWindow)
 	if clicked && !a.floating.drag.moved {
 		a.floatingClicked()
 	}
@@ -333,30 +686,41 @@ func (a *App) floatingView(c *ui.Context) {
 }
 
 // trackFloatingDrag follows a press: past a few DIPs it is a drag, which
-// moves the window unless its position is locked.
-func (a *App) trackFloatingDrag(held, locked bool) {
+// moves the window unless its position is locked, and docks it at an edge
+// of the display when edge hiding is on.
+func (a *App) trackFloatingDrag(held bool, f store.FloatingWindow) {
 	d, win := &a.floating.drag, a.floating.win
 	if win == nil {
 		return
 	}
 	if !held {
-		if d.moved && !locked {
-			a.keepFloatingOnScreen()
+		if d.moved && !f.Locked {
+			if f.EdgeHide {
+				a.dockFloatingRelease(f)
+			} else {
+				a.keepFloatingOnScreen()
+			}
 		}
 		return
 	}
-	cursor := mygo.Screen.CursorScreenPoint()
 	if !d.active {
+		// The window follows the pointer now; a dock slide and fade give
+		// way, and an invisible window is never dragged.
+		a.stopFloatingDockAnim()
+		a.stopFloatingDockFade()
+		setFloatingOpacity(win, float64(f.OpacityPercent())/100)
+		cursor := mygo.Screen.CursorScreenPoint()
 		x, y := win.Position()
 		*d = floatingDrag{active: true, cursor: cursor, x: x, y: y}
 		return
 	}
+	cursor := mygo.Screen.CursorScreenPoint()
 	dx, dy := cursor.X-d.cursor.X, cursor.Y-d.cursor.Y
 	if !d.moved && dx*dx+dy*dy < 9 {
 		return
 	}
 	d.moved = true
-	if !locked {
+	if !f.Locked {
 		win.SetPosition(d.x+dx, d.y+dy)
 	}
 }
