@@ -384,3 +384,82 @@ func TestHistoryRatesSortedByID(t *testing.T) {
 		t.Fatalf("rates for unknown provider = %+v", rates)
 	}
 }
+
+func balanceState(totals ...Balance) State { return State{Status: StatusOK, Balances: totals} }
+
+func TestHistoryBalanceRateAndDepletion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "h.json")
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	h := LoadHistory(path)
+	for i, v := range []float64{100, 90, 80} {
+		if err := h.RecordBalances("deepseek", balanceState(Balance{Currency: "CNY", Total: v}), now.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The balance flag survives the reload.
+	h = LoadHistory(path)
+	r := rateOf(t, h.Rates("deepseek", now.Add(2*time.Hour)), BalancePoolID("CNY"))
+	if !r.IsBalance || r.IsPercent || r.Unit != "CNY" {
+		t.Fatalf("balance rate flags = %+v", r)
+	}
+	if !r.HasRate || r.PerHour != 10 {
+		t.Fatalf("spend rate = %+v want 10/h", r)
+	}
+	// 80 left at 10/h → depleted 8h after the last sample.
+	want := now.Add(2 * time.Hour).Add(8 * time.Hour)
+	if !r.HasExhaust || !r.ExhaustsAt.Equal(want) {
+		t.Fatalf("exhaust = %+v want %v", r, want)
+	}
+	if r.HasAtReset || r.HasReset {
+		t.Fatalf("balance pool must not project at-reset: %+v", r)
+	}
+}
+
+func TestHistoryBalanceTopUpCutsSegment(t *testing.T) {
+	h := LoadHistory(filepath.Join(t.TempDir(), "h.json"))
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Spend 100→90, top up to 200, then spend to 190: the rise cuts the
+	// segment exactly like a reset cuts a usage segment.
+	for i, v := range []float64{100, 90, 200, 190} {
+		if err := h.RecordBalances("deepseek", balanceState(Balance{Currency: "CNY", Total: v}), now.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := rateOf(t, h.Rates("deepseek", now.Add(3*time.Hour)), BalancePoolID("CNY"))
+	if r.Samples != 2 || !r.From.Equal(now.Add(2*time.Hour)) {
+		t.Fatalf("segment = %+v want the two post-top-up samples", r)
+	}
+	if !r.HasRate || r.PerHour != 10 {
+		t.Fatalf("spend rate = %+v want 10/h after the top-up", r)
+	}
+}
+
+func TestHistoryBalanceMultiCurrencyAndAbsentTotals(t *testing.T) {
+	h := LoadHistory(filepath.Join(t.TempDir(), "h.json"))
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	st := balanceState(
+		Balance{Currency: "CNY", Total: 100},
+		Balance{Currency: "USD", Total: math.NaN()},
+		Balance{Total: 50}, // no currency: one unnamed pool, unit unknown
+	)
+	if err := h.RecordBalances("deepseek", st, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.RecordBalances("deepseek", balanceState(
+		Balance{Currency: "CNY", Total: 90},
+		Balance{Total: 40},
+	), now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := h.providers["deepseek"][BalancePoolID("USD")]; ok {
+		t.Fatal("absent total must not create a pool")
+	}
+	cny := rateOf(t, h.Rates("deepseek", now.Add(time.Hour)), BalancePoolID("CNY"))
+	if !cny.HasRate || cny.PerHour != 10 {
+		t.Fatalf("CNY rate = %+v", cny)
+	}
+	plain := rateOf(t, h.Rates("deepseek", now.Add(time.Hour)), BalancePoolID(""))
+	if plain.Unit != "unknown" || !plain.IsBalance {
+		t.Fatalf("currency-less pool = %+v", plain)
+	}
+}

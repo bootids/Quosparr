@@ -44,22 +44,29 @@ type Sample struct {
 type PoolMeta struct {
 	Title string `json:"title"`
 	Unit  string `json:"unit"`
+	// Balance marks a pool whose series is a prepaid balance total
+	// (deepseek): it decreases as it is spent and a real increase is a
+	// top-up, the mirror image of a usage pool.
+	Balance bool `json:"balance,omitempty"`
 }
 
 // Rate is the derived consumption-rate analysis of one pool.
 type Rate struct {
 	ID, Title, Unit string
 	IsPercent       bool // PerHour/AtReset are percentage points, not amount units
-	PerHour         float64
-	HasRate         bool // slope of the current (post-reset) segment
-	Samples         int  // samples in the segment used
-	From, To        time.Time
-	ExhaustsAt      time.Time
-	HasExhaust      bool
-	ResetsAt        time.Time
-	HasReset        bool
-	AtReset         float64
-	HasAtReset      bool
+	// IsBalance marks a prepaid-balance pool: PerHour is the spend rate of
+	// the total and ExhaustsAt is its depletion projection.
+	IsBalance    bool
+	PerHour      float64
+	HasRate      bool // slope of the current (post-reset) segment
+	Samples      int  // samples in the segment used
+	From, To     time.Time
+	ExhaustsAt   time.Time
+	HasExhaust   bool
+	ResetsAt     time.Time
+	HasReset     bool
+	AtReset      float64
+	HasAtReset   bool
 }
 
 type poolFile struct {
@@ -104,55 +111,99 @@ func LoadHistory(path string) *History {
 	return h
 }
 
+// BalancePoolID is the stable pool ID of one prepaid-balance row, keyed by
+// currency so multi-currency balances (deepseek CNY/USD) sample separately.
+func BalancePoolID(currency string) string { return "balance:" + currency }
+
 // Record appends one Sample per pool in st and persists atomically.
 func (h *History) Record(provider string, st State, now time.Time) error {
+	return h.record(provider, func(pools map[string]*poolFile) bool {
+		recorded := false
+		for _, lim := range st.Limits {
+			s := Sample{
+				At:         now,
+				HasUsed:    !math.IsNaN(lim.Used),
+				HasPercent: lim.HasPercent && !math.IsNaN(lim.Percent),
+				HasLimit:   !math.IsNaN(lim.LimitValue),
+				HasReset:   lim.HasReset,
+				ResetsAt:   lim.ResetsAt,
+			}
+			// Missing numerics stay zero: encoding/json cannot marshal NaN, and
+			// readers gate every value on its Has* flag anyway.
+			if s.HasUsed {
+				s.Used = lim.Used
+			}
+			if s.HasPercent {
+				s.Percent = lim.Percent
+			}
+			if s.HasLimit {
+				s.LimitValue = lim.LimitValue
+			}
+			if !s.HasUsed && !s.HasPercent {
+				continue
+			}
+			if appendSample(pools, lim.ID, PoolMeta{Title: lim.Title, Unit: lim.Unit}, s, now) {
+				recorded = true
+			}
+		}
+		return recorded
+	})
+}
+
+// RecordBalances samples st.Balances into balance-mode pools: the series is
+// the prepaid total itself, so spending shows as a decrease and a real
+// increase is a top-up. Only providers whose balances feed rate analysis
+// (deepseek) call this; detail-only balances (pixellab) are never sampled.
+func (h *History) RecordBalances(provider string, st State, now time.Time) error {
+	return h.record(provider, func(pools map[string]*poolFile) bool {
+		recorded := false
+		for _, b := range st.Balances {
+			if math.IsNaN(b.Total) {
+				continue
+			}
+			unit := b.Currency
+			if unit == "" {
+				unit = "unknown"
+			}
+			s := Sample{At: now, HasUsed: true, Used: b.Total}
+			if appendSample(pools, BalancePoolID(b.Currency), PoolMeta{Unit: unit, Balance: true}, s, now) {
+				recorded = true
+			}
+		}
+		return recorded
+	})
+}
+
+// record ensures the provider's pool map exists, lets sample fill it and
+// saves when at least one sample was stored.
+func (h *History) record(provider string, sample func(pools map[string]*poolFile) bool) error {
 	pools := h.providers[provider]
 	if pools == nil {
 		pools = make(map[string]*poolFile)
 		h.providers[provider] = pools
 	}
-	recorded := false
-	for _, lim := range st.Limits {
-		s := Sample{
-			At:         now,
-			HasUsed:    !math.IsNaN(lim.Used),
-			HasPercent: lim.HasPercent && !math.IsNaN(lim.Percent),
-			HasLimit:   !math.IsNaN(lim.LimitValue),
-			HasReset:   lim.HasReset,
-			ResetsAt:   lim.ResetsAt,
-		}
-		// Missing numerics stay zero: encoding/json cannot marshal NaN, and
-		// readers gate every value on its Has* flag anyway.
-		if s.HasUsed {
-			s.Used = lim.Used
-		}
-		if s.HasPercent {
-			s.Percent = lim.Percent
-		}
-		if s.HasLimit {
-			s.LimitValue = lim.LimitValue
-		}
-		if !s.HasUsed && !s.HasPercent {
-			continue
-		}
-		pf := pools[lim.ID]
-		if pf == nil {
-			pf = &poolFile{Meta: PoolMeta{Title: lim.Title, Unit: lim.Unit}}
-			pools[lim.ID] = pf
-		}
-		if n := len(pf.Samples); n > 0 && pf.Samples[n-1].At.After(now.Add(-historyMinSpacing)) {
-			// Too soon: refresh metadata only.
-			pf.Meta = PoolMeta{Title: lim.Title, Unit: lim.Unit}
-			continue
-		}
-		pf.Samples = append(pf.Samples, s)
-		pf.prune(now)
-		recorded = true
-	}
-	if !recorded {
+	if !sample(pools) {
 		return nil
 	}
 	return h.save()
+}
+
+// appendSample adds one sample to pool id (creating it with meta) while
+// honoring the minimum spacing; it reports whether a sample was stored.
+func appendSample(pools map[string]*poolFile, id string, meta PoolMeta, s Sample, now time.Time) bool {
+	pf := pools[id]
+	if pf == nil {
+		pf = &poolFile{Meta: meta}
+		pools[id] = pf
+	}
+	if n := len(pf.Samples); n > 0 && pf.Samples[n-1].At.After(now.Add(-historyMinSpacing)) {
+		// Too soon: refresh metadata only.
+		pf.Meta = meta
+		return false
+	}
+	pf.Samples = append(pf.Samples, s)
+	pf.prune(now)
+	return true
 }
 
 func (p *poolFile) prune(now time.Time) {
@@ -237,26 +288,31 @@ func series(s Sample) (float64, bool) {
 	return 0, false
 }
 
-// analyzePool computes the Rate for one pool.
+// analyzePool computes the Rate for one pool. Usage pools count up and a real
+// decrease cuts the segment (a reset); balance pools count down and a real
+// increase cuts it (a top-up), so PerHour is the consumption rate of both.
 func analyzePool(id string, pf *poolFile, _ time.Time) Rate {
 	samples := pf.Samples
 	latest := samples[len(samples)-1]
+	balance := pf.Meta.Balance
 	r := Rate{
-		ID:        id,
-		Title:     pf.Meta.Title,
-		Unit:      pf.Meta.Unit,
-		IsPercent: !latest.HasUsed && latest.HasPercent,
-		Samples:   1,
-		From:      latest.At,
-		To:        latest.At,
-		HasReset:  latest.HasReset,
-		ResetsAt:  latest.ResetsAt,
+		ID:         id,
+		Title:      pf.Meta.Title,
+		Unit:       pf.Meta.Unit,
+		IsPercent:  !latest.HasUsed && latest.HasPercent,
+		IsBalance:  balance,
+		Samples:    1,
+		From:       latest.At,
+		To:         latest.At,
+		HasReset:   latest.HasReset,
+		ResetsAt:   latest.ResetsAt,
 	}
 	if !latest.HasUsed && !latest.HasPercent {
 		return r
 	}
 
-	// Walk backwards building the current segment; a real decrease cuts it.
+	// Walk backwards building the current segment; a real change of
+	// direction cuts it.
 	tolerance := 0.1
 	if latest.HasLimit && !math.IsNaN(latest.LimitValue) && latest.LimitValue > 0 {
 		tolerance = 0.005 * latest.LimitValue
@@ -269,8 +325,12 @@ func analyzePool(id string, pf *poolFile, _ time.Time) Rate {
 		if !okNew || !okOld {
 			break
 		}
-		if vNew < vOld-tolerance {
-			break
+		if balance {
+			if vNew > vOld+tolerance {
+				break // top-up
+			}
+		} else if vNew < vOld-tolerance {
+			break // reset
 		}
 		start = i
 	}
@@ -304,28 +364,41 @@ func analyzePool(id string, pf *poolFile, _ time.Time) Rate {
 			perHour = (vNew - vOld) / span.Seconds() * 3600
 		}
 	}
+	consumption := perHour
+	if balance {
+		consumption = -perHour // a falling balance is positive consumption
+	}
 	if span >= historyMinSpan {
-		r.PerHour = perHour
+		r.PerHour = consumption
 		r.HasRate = true
 	}
 
 	latestVal, _ := series(latest)
-	if r.HasRate && perHour > 0 {
-		var cap float64
-		if r.IsPercent {
-			cap = 100
-		} else if latest.HasLimit && latest.LimitValue > 0 {
-			cap = latest.LimitValue
-		}
-		if cap > 0 {
-			hours := (cap - latestVal) / perHour
+	if r.HasRate && consumption > 0 {
+		if balance {
+			// Depletion: the prepaid total reaching zero.
+			hours := latestVal / consumption
 			if !math.IsInf(hours, 0) && !math.IsNaN(hours) && hours >= 0 && time.Duration(hours*float64(time.Hour)) <= historyMaxProjection {
 				r.ExhaustsAt = latest.At.Add(time.Duration(hours * float64(time.Hour)))
 				r.HasExhaust = true
 			}
+		} else {
+			var cap float64
+			if r.IsPercent {
+				cap = 100
+			} else if latest.HasLimit && latest.LimitValue > 0 {
+				cap = latest.LimitValue
+			}
+			if cap > 0 {
+				hours := (cap - latestVal) / consumption
+				if !math.IsInf(hours, 0) && !math.IsNaN(hours) && hours >= 0 && time.Duration(hours*float64(time.Hour)) <= historyMaxProjection {
+					r.ExhaustsAt = latest.At.Add(time.Duration(hours * float64(time.Hour)))
+					r.HasExhaust = true
+				}
+			}
 		}
 	}
-	if r.HasRate && r.HasReset && r.ResetsAt.After(latest.At) {
+	if !balance && r.HasRate && r.HasReset && r.ResetsAt.After(latest.At) {
 		hoursUntil := r.ResetsAt.Sub(latest.At).Hours()
 		at := latestVal + perHour*hoursUntil
 		clamp := 100.0

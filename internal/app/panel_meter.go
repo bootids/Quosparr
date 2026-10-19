@@ -150,7 +150,9 @@ func panelMeterRates(c *ui.Context, l l10n.Localizer, ms runway.MeterState, now 
 		}
 	}
 	if usable == 0 {
-		if len(ms.Meters) > 0 {
+		// The hint needs something to attach to: quota pools, or the
+		// balance detail lines of a provider without pools (deepseek).
+		if len(ms.Meters) > 0 || len(ms.Detail) > 0 {
 			dimText(c, tx(l, xMeterRateEmpty))
 		}
 		return

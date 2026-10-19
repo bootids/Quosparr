@@ -177,3 +177,105 @@ func TestPanelMeterRateUnknownUnitAndFloatArtifacts(t *testing.T) {
 		}
 	}
 }
+
+func TestMeterModuleRecordsBalanceHistoryAndExposesRates(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "meter-history.json")
+	hist := meter.LoadHistory(path)
+	mod := newMeterModule(enLocalizer(), func(context.Context) meter.State {
+		return meter.State{Status: meter.StatusOK, Balances: []meter.Balance{
+			{Currency: "CNY", Total: 80},
+		}}
+	}, nil)
+	mod.provider = store.ProviderDeepSeek
+	mod.history = hist
+	mod.sampleBalances = true
+
+	// Seed a sample one hour back so a usable spend rate exists without
+	// waiting for the history's minimum span.
+	base := time.Now().Add(-time.Hour)
+	if err := hist.RecordBalances(string(store.ProviderDeepSeek), meter.State{Status: meter.StatusOK, Balances: []meter.Balance{
+		{Currency: "CNY", Total: 100},
+	}}, base); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := mod.Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	st := mod.State(time.Now())
+	var rate *runway.MeterRate
+	for i := range st.Rates {
+		if st.Rates[i].ID == meter.BalancePoolID("CNY") {
+			rate = &st.Rates[i]
+		}
+	}
+	if rate == nil {
+		t.Fatalf("no balance rate mapped: %+v", st.Rates)
+	}
+	if rate.Title != "Balance (CNY)" || rate.Unit != "CNY" {
+		t.Fatalf("balance rate title/unit = %q/%q", rate.Title, rate.Unit)
+	}
+	if !rate.HasRate || rate.PerHour < 19.9 || rate.PerHour > 20.1 {
+		t.Fatalf("spend rate = %+v want ~20/h", rate)
+	}
+	// 80 left at 20/h → depleted about four hours from the latest sample.
+	if !rate.HasExhaust || time.Until(rate.ExhaustsAt) > 5*time.Hour {
+		t.Fatalf("depletion = %+v", rate)
+	}
+}
+
+func TestMeterModuleWithoutBalanceSamplingStaysDetailOnly(t *testing.T) {
+	// Pixellab keeps its balance as a detail line: no balance pools are
+	// recorded even after successful refreshes.
+	hist := meter.LoadHistory(filepath.Join(t.TempDir(), "meter-history.json"))
+	mod := newMeterModule(enLocalizer(), func(context.Context) meter.State {
+		return meter.State{Status: meter.StatusOK, Balances: []meter.Balance{
+			{Currency: "USD", Total: 12.5},
+		}}
+	}, nil)
+	mod.provider = store.ProviderPixelLab
+	mod.history = hist
+	for range 2 {
+		if err := mod.Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if pools := hist.Rates(string(store.ProviderPixelLab), time.Now()); len(pools) != 0 {
+		t.Fatalf("pixellab balances must not sample: %+v", pools)
+	}
+}
+
+func TestPanelMeterBalanceRateRowAndHint(t *testing.T) {
+	l := l10n.New(l10n.English)
+	now := time.Now()
+	balanceRow := runway.MeterRate{
+		ID: meter.BalancePoolID("CNY"), Title: "Balance (CNY)", Unit: "CNY",
+		PerHour: 1.25, HasRate: true, HasExhaust: true, ExhaustsAt: now.Add(64 * time.Hour),
+	}
+	tt := rateTestPanel(t, store.ProviderDeepSeek, runway.MeterState{
+		Availability: runway.MeterReady,
+		Detail:       []runway.DetailLine{{Title: "Balance (CNY)", Value: "80 · granted 30"}},
+		Rates:        []runway.MeterRate{balanceRow},
+	})
+	for _, want := range []string{
+		tx(l, xMeterRateAnalysis),
+		"Balance (CNY)",
+		"≈ 1.25 CNY/h",
+		tx(l, xMeterRateExhausts, "64h"),
+	} {
+		if !tt.HasText(want) {
+			t.Fatalf("balance rate row missing %q; texts %q", want, tt.Texts())
+		}
+	}
+
+	// While samples accumulate, the balance detail lines anchor the hint.
+	empty := rateTestPanel(t, store.ProviderDeepSeek, runway.MeterState{
+		Availability: runway.MeterReady,
+		Detail:       []runway.DetailLine{{Title: "Balance (CNY)", Value: "80"}},
+	})
+	if !empty.HasText(tx(l, xMeterRateEmpty)) {
+		t.Fatalf("sampling hint missing for balance-only provider; texts %q", empty.Texts())
+	}
+}

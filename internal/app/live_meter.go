@@ -46,6 +46,10 @@ type meterModule struct {
 	// history persists pool samples between refreshes; nil disables
 	// recording and rate analysis.
 	history *meter.History
+	// sampleBalances records the state's prepaid balances into the history
+	// as balance-mode pools (deepseek); providers whose balances stay
+	// detail lines (pixellab) leave it false.
+	sampleBalances bool
 	// speedScan derives the provider's model-speed report from local
 	// session stats; nil (cursor, agy) means the provider has none.
 	speedScan func(ctx context.Context, now time.Time) (speed.Report, error)
@@ -75,7 +79,9 @@ func (m *meterModule) State(now time.Time) runway.MeterState {
 	st := meterStateFromRaw(lc, raw, loaded, now)
 	st.Speed, st.SpeedError = speed, speedErr
 	if m.history != nil && st.Availability == runway.MeterReady {
-		st.Rates = meterHistoryRates(currentLimitRates(raw.Limits, m.history.Rates(string(m.provider), now)))
+		rates := currentMeterRates(raw, m.history.Rates(string(m.provider), now))
+		balanceRateTitles(lc, rates)
+		st.Rates = meterHistoryRates(rates)
 	}
 	return st
 }
@@ -91,7 +97,11 @@ func (m *meterModule) Refresh(ctx context.Context) error {
 	m.loaded = true
 	m.mu.Unlock()
 	if m.history != nil && raw.Status == meter.StatusOK {
-		_ = m.history.Record(string(m.provider), raw, time.Now())
+		now := time.Now()
+		_ = m.history.Record(string(m.provider), raw, now)
+		if m.sampleBalances {
+			_ = m.history.RecordBalances(string(m.provider), raw, now)
+		}
 	}
 	// The speed scan is independent of the quota fetch, so it runs after
 	// both success and failure.
@@ -299,16 +309,20 @@ func meterAmount(v float64) string {
 	return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64)
 }
 
-// currentLimitRates keeps only the rate rows whose pool still exists in the
-// current limits; history leftovers from pools that disappeared (for example
-// after a window filter change) must not keep rendering.
-func currentLimitRates(limits []meter.Limit, rs []meter.Rate) []meter.Rate {
+// currentMeterRates keeps only the rate rows whose pool still exists in the
+// current state: limits by ID and balance currencies by their pool ID.
+// History leftovers from pools that disappeared (for example after a window
+// filter change or a currency row vanishing) must not keep rendering.
+func currentMeterRates(raw meter.State, rs []meter.Rate) []meter.Rate {
 	if len(rs) == 0 {
 		return nil
 	}
-	ids := make(map[string]bool, len(limits))
-	for _, l := range limits {
+	ids := make(map[string]bool, len(raw.Limits)+len(raw.Balances))
+	for _, l := range raw.Limits {
 		ids[l.ID] = true
+	}
+	for _, b := range raw.Balances {
+		ids[meter.BalancePoolID(b.Currency)] = true
 	}
 	kept := make([]meter.Rate, 0, len(rs))
 	for _, r := range rs {
@@ -320,6 +334,22 @@ func currentLimitRates(limits []meter.Limit, rs []meter.Rate) []meter.Rate {
 		return nil
 	}
 	return kept
+}
+
+// balanceRateTitles labels balance-pool rate rows like the balance detail
+// lines: the localized title plus the currency. Limit pools carry their own
+// provider title; balance pools record only the currency as their unit.
+func balanceRateTitles(lc l10n.Localizer, rs []meter.Rate) {
+	for i := range rs {
+		if !rs[i].IsBalance {
+			continue
+		}
+		title := lc.Text(l10n.KeyMeterBalance)
+		if u := rs[i].Unit; u != "" && u != "unknown" {
+			title += " (" + u + ")"
+		}
+		rs[i].Title = title
+	}
 }
 
 // meterHistoryRates maps the derived pool rates to the runway mirror,
@@ -498,6 +528,8 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 			key, err := deepseekMeterKey(root)
 			return err == nil && key != ""
 		})
+	// DeepSeek has no quota pools; its prepaid balance is the rate source.
+	deepseekMod.sampleBalances = true
 	minimaxMod := newMeterModule(lc,
 		func(ctx context.Context) meter.State {
 			key, region, ok, err := minimaxMeterCredential(root, home)
