@@ -287,15 +287,16 @@ func (s *Service) showsProviderLocked(p store.Provider) bool {
 }
 
 // quotaWantedLocked reports whether the provider's quota refreshes: it is
-// shown, or it has a tab in the panel's provider strip. A provider the panel
-// hides and nothing else shows is not fetched.
+// shown, has a tab in the panel's provider strip, or feeds the status export.
+// Remote viewers choose their own providers, so the export needs every quota.
 func (s *Service) quotaWantedLocked(p store.Provider) bool {
-	return s.showsProviderLocked(p) || slices.Contains(s.prefs.PanelSelection(), p)
+	return s.prefs.ExportsStatusJSON || s.showsProviderLocked(p) || slices.Contains(s.prefs.PanelSelection(), p)
 }
 
 // meterDemandLocked captures each quota-only provider's demand for a full
 // refresh: the quota fetch runs when the provider is demanded (selected, in
-// the status bar or floating selection, or in the panel's provider strip),
+// the status bar or floating selection, in the panel's provider strip, or
+// needed for the status export),
 // and the cheap credential re-detection runs on the same cadence the Grok
 // and Claude local refreshes would. Undemanded providers stay untouched.
 func (s *Service) meterDemandLocked(widgetLocal, exportLocal bool) (want, show, local map[store.Provider]bool) {

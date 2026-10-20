@@ -123,6 +123,53 @@ func TestManualQuotaRefreshCoversDemandedMeters(t *testing.T) {
 	}
 }
 
+func TestStatusExportRefreshesHiddenProviderQuotas(t *testing.T) {
+	for _, exporting := range []bool{false, true} {
+		t.Run(map[bool]string{false: "local-only", true: "export"}[exporting], func(t *testing.T) {
+			f := newFake(t)
+			g, c := &fakeGrok{}, &fakeClaude{}
+			meters := map[store.Provider]MeterProvider{}
+			for _, p := range MeterProviders() {
+				meters[p] = &fakeMeter{}
+			}
+			s, _ := newService(t, f, func(o *Options) {
+				o.Grok, o.Claude, o.Meters = g, c, meters
+				o.Preferences.PanelProviders = []store.Provider{store.ProviderCodex}
+				o.Preferences.ExportsStatusJSON = exporting
+			})
+			check := func(want int) {
+				t.Helper()
+				if g.count() != want || len(c.calls()) != want {
+					t.Fatalf("hidden quotas: grok %d, claude %d, want %d", g.count(), len(c.calls()), want)
+				}
+				for p, m := range meters {
+					if r, _ := m.(*fakeMeter).counts(); r != want {
+						t.Errorf("hidden %s refreshed %d times, want %d", p, r, want)
+					}
+				}
+			}
+			want := 0
+			if exporting {
+				want = 1
+			}
+			refreshAll(t, s)
+			check(want)
+			s.Tick(f.clk.Advance(time.Duration(s.Preferences().RefreshIntervalSeconds) * time.Second))
+			settle(t, s)
+			check(2 * want)
+			wait(t, s.RefreshQuota())
+			settle(t, s)
+			check(3 * want)
+
+			p := s.Preferences()
+			p.ExportsStatusJSON = false
+			s.SetPreferences(p)
+			refreshAll(t, s)
+			check(3 * want)
+		})
+	}
+}
+
 // status.json carries a provider block per meter provider with data, and
 // omits the ones without a detected credential.
 func TestStatusJSONMeterProviderRoundTrip(t *testing.T) {
