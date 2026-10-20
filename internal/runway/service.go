@@ -230,17 +230,17 @@ func New(o Options) *Service {
 	s.progressReports = usage.NewProgressReporter(100*time.Millisecond, s.setProgress)
 	s.bootstrap()
 	if o.Grok != nil {
-		o.Grok.SetOnChange(s.publish)
+		o.Grok.SetOnChange(s.providerChanged)
 	}
 	if o.Claude != nil {
-		o.Claude.SetOnChange(s.publish)
+		o.Claude.SetOnChange(s.providerChanged)
 	}
 	if o.ResetToday != nil {
 		o.ResetToday.SetOnChange(s.publish)
 	}
 	for _, provider := range MeterProviders() {
 		if m := o.Meters[provider]; m != nil {
-			m.SetOnChange(s.publish)
+			m.SetOnChange(s.providerChanged)
 		}
 	}
 	return s
@@ -361,6 +361,15 @@ func (s *Service) publish() {
 	s.mu.Lock()
 	s.publishLocked()
 	s.mu.Unlock()
+}
+
+// Provider callbacks also update the opt-in export after manual refreshes
+// and account changes, even when no Codex/full refresh completes afterwards.
+func (s *Service) providerChanged() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exportStatusLocked()
+	s.publishLocked()
 }
 
 func (s *Service) publishLocked() { s.publishSnapLocked(s.buildLocked(s.now())) }

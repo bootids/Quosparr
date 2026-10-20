@@ -15,6 +15,7 @@ import (
 	"github.com/licoy/quosparr/internal/cursor"
 	"github.com/licoy/quosparr/internal/deepseek"
 	"github.com/licoy/quosparr/internal/elevenlabs"
+	"github.com/licoy/quosparr/internal/export"
 	"github.com/licoy/quosparr/internal/kimi"
 	"github.com/licoy/quosparr/internal/l10n"
 	"github.com/licoy/quosparr/internal/meter"
@@ -77,6 +78,10 @@ func (m *meterModule) State(now time.Time) runway.MeterState {
 	speed, speedErr := m.speed, m.speedErr
 	m.mu.Unlock()
 	st := meterStateFromRaw(lc, raw, loaded, now)
+	if loaded {
+		q := export.MeterQuota(raw)
+		st.Quota = &q
+	}
 	st.Speed, st.SpeedError = speed, speedErr
 	if m.history != nil && st.Availability == runway.MeterReady {
 		rates := currentMeterRates(raw, m.history.Rates(string(m.provider), now))

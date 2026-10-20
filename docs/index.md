@@ -10,6 +10,7 @@ Paths below are relative to this index. A scaffold is an invitation to inspect t
 - [docs/SAVE_SYSTEM.md](SAVE_SYSTEM.md) — Local save integrity and compatibility
 - [docs/NETWORKING.md](NETWORKING.md) — Network boundaries, authority, and validation
 - [docs/SECURITY.md](SECURITY.md) — Actual trust boundaries and security checks
+- [Quota 只读接口](quota-readout.md) — Versioned quota JSON, CLI queries and freshness rules
 
 ## Existing or retained documents
 

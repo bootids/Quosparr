@@ -827,6 +827,7 @@ func buildGrokState(mod *grok.Module, lc l10n.Localizer) runway.GrokState {
 		snap = &parsed
 	}
 	st.Availability = grokAvailability(&acc, snap != nil)
+	st.QuotaFailed = acc.LastError != ""
 	st.LastError = grokErrorText(lc, st.Availability)
 	if acc.LastQuotaAt != nil {
 		st.UpdatedAt = *acc.LastQuotaAt

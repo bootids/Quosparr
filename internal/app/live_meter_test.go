@@ -44,6 +44,9 @@ func TestMeterModuleMapsReadyState(t *testing.T) {
 		t.Fatalf("meters = %+v", st.Meters)
 	}
 	m := st.Meters[0]
+	if st.Quota == nil || st.Quota.Status != "ok" || st.Quota.Limits[0].ID != "tokens_5h" {
+		t.Fatalf("machine quota = %+v", st.Quota)
+	}
 	if m.Title != enLocalizer().Text(l10n.KeyFiveHourUsage) || m.UsedPercent != 40 {
 		t.Fatalf("meter = %+v", m)
 	}

@@ -59,6 +59,19 @@ func main() {
 		home, _ := platform.Home()
 		app.SelfCheck(os.Stdout, home, appVersion())
 		return
+	case app.CommandQuota:
+		home, err := platform.Home()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "quota: cannot locate home directory")
+			os.Exit(1)
+		}
+		args := os.Args[1:]
+		// --quota owns all following arguments; it never enters desktop startup.
+		for i, arg := range args {
+			if arg == "--quota" {
+				os.Exit(app.ReadQuota(os.Stdout, os.Stderr, home, args[i+1:], time.Now()))
+			}
+		}
 	}
 	os.Exit(run(command))
 }

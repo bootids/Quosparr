@@ -10,6 +10,7 @@ const (
 	CommandRun Command = iota
 	CommandHelp
 	CommandSelfCheck
+	CommandQuota
 	CommandSettings
 )
 
@@ -27,15 +28,21 @@ Options:
   --settings
       Open the settings window after launching.
 
+  --quota [--status-file PATH] [--max-age SECONDS] [provider ...]
+      Print versioned quota JSON from the status export and exit. No network.
+      Requires Export status JSON; max-age defaults to 900 seconds.
+
 `
 
 // ParseArgs picks the command from args (without the program name).
-// --help wins over --self-check, which wins over --settings. Anything else
+// --help wins over --quota, then --self-check, then --settings. Anything else
 // is ignored, so flags a launcher adds never keep the app from starting.
 func ParseArgs(args []string) Command {
 	switch {
 	case slices.Contains(args, "--help") || slices.Contains(args, "-h"):
 		return CommandHelp
+	case slices.Contains(args, "--quota"):
+		return CommandQuota
 	case slices.Contains(args, "--self-check"):
 		return CommandSelfCheck
 	case slices.Contains(args, "--settings"):

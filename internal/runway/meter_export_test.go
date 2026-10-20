@@ -158,8 +158,8 @@ func TestStatusJSONMeterProviderRoundTrip(t *testing.T) {
 	if !strings.Contains(string(data), `"cursor"`) {
 		t.Fatalf("cursor key absent: %s", data)
 	}
-	if strings.Contains(string(data), `"zai"`) {
-		t.Fatalf("zai leaked: %s", data)
+	if snap.QuotaReport.Providers["zai"].Status != "not_configured" {
+		t.Fatal("quota readout must explicitly mark unconfigured providers")
 	}
 }
 

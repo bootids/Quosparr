@@ -40,6 +40,7 @@ const (
 // carries its panel payload untouched for the Grok UI to type-assert.
 type GrokState struct {
 	Availability GrokAvailability
+	QuotaFailed  bool // last quota fetch failed, independent of local scans
 	Accounts     AccountsView
 	// AccountQuotas is the cached quota line of each managed account by id,
 	// for the account list; accounts without a reading are absent.
@@ -121,6 +122,7 @@ const (
 // ExtraUsage is the raw used/limit text.
 type ClaudeState struct {
 	Availability   ClaudeAvailability
+	QuotaFailed    bool // last quota fetch failed, independent of local scans
 	Accounts       AccountsView
 	AccountQuotas  map[string]ClaudeAccountQuota
 	Plan           string
@@ -240,6 +242,8 @@ const (
 // Amount pools carry their value in the meter's ValueText.
 type MeterState struct {
 	Availability MeterAvailability
+	// Quota preserves numeric business data for the public readout, not UI text.
+	Quota *export.QuotaProvider
 	// Plan is the subscription tier name ("" when unknown).
 	Plan   string
 	Meters []Meter

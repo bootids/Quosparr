@@ -225,6 +225,7 @@ func buildClaudeState(mod *claude.Module, lc l10n.Localizer, gateway bool) runwa
 		snap = &parsed
 	}
 	st.Availability = claudeAvailability(&acc, snap != nil, gateway)
+	st.QuotaFailed = acc.LastError != ""
 	st.LastError = claudeErrorText(lc, st.Availability)
 	if acc.LastQuotaAt != nil {
 		st.UpdatedAt = *acc.LastQuotaAt

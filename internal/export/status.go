@@ -122,6 +122,7 @@ type CostSummary struct {
 // StatusSnapshot is the content of status.json.
 type StatusSnapshot struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
+	QuotaReport *QuotaReport      `json:"quotaReport,omitempty"`
 	Quota       *StatusQuota      `json:"quota,omitempty"`
 	Cost        *CostSummary      `json:"cost,omitempty"`
 	Sessions    *sessions.Summary `json:"sessions,omitempty"`
