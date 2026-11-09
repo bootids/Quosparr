@@ -12,9 +12,25 @@ const QuotaSchemaVersion = 1
 // QuotaReport is the machine-readable, current-account quota contract.
 // It intentionally excludes identities, URLs, credentials and free-form errors.
 type QuotaReport struct {
-	SchemaVersion int                      `json:"schema_version"`
-	GeneratedAt   time.Time                `json:"generated_at"`
-	Providers     map[string]QuotaProvider `json:"providers"`
+	SchemaVersion int       `json:"schema_version"`
+	GeneratedAt   time.Time `json:"generated_at"`
+	// RefreshIntervalSeconds is the app's refresh interval when the report
+	// was written; readers derive their default freshness limit from it.
+	RefreshIntervalSeconds *int                     `json:"refresh_interval_seconds,omitempty"`
+	Providers              map[string]QuotaProvider `json:"providers"`
+}
+
+// DefaultQuotaMaxAge is the freshness limit when a report carries no
+// refresh interval (older Quosparr builds).
+const DefaultQuotaMaxAge = 900 * time.Second
+
+// DefaultMaxAge is twice the refresh interval, so data from the previous
+// refresh is still fresh while the next one is in flight.
+func (r QuotaReport) DefaultMaxAge() time.Duration {
+	if r.RefreshIntervalSeconds == nil || *r.RefreshIntervalSeconds <= 0 {
+		return DefaultQuotaMaxAge
+	}
+	return 2 * time.Duration(*r.RefreshIntervalSeconds) * time.Second
 }
 
 type QuotaProvider struct {

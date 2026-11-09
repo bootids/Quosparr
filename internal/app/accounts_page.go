@@ -47,6 +47,9 @@ func renderAccountsPage(c *ui.Context, u *settingsUI) {
 		renderRemoteAccountsPage(c, u, f, rt)
 		return
 	}
+	if p := accountKindProvider(f.kind); rt.meterMods[p] != nil {
+		renderMeterEnabledSwitch(c, u, f, rt, p)
+	}
 	switch f.kind {
 	case accountKindCodex:
 		renderCodexAccounts(c, u, f, rt)

@@ -124,6 +124,8 @@ const (
 	xLegacyQuitAndContinue            textKey = "legacyQuitAndContinue"
 	xLegacyQuitFailed                 textKey = "legacyQuitFailed"
 	xMeterConfigSave                  textKey = "meterConfigSave"
+	xMeterEnabled                     textKey = "meterEnabled"
+	xMeterDisabledNote                textKey = "meterDisabledNote"
 	xMeterConfigNotConfigured         textKey = "meterConfigNotConfigured"
 	xMeterConfigReadFailed            textKey = "meterConfigReadFailed"
 	xMeterConfigUser                  textKey = "meterConfigUser"
@@ -691,6 +693,19 @@ var extraTexts = map[textKey][7]string{
 	},
 	xMeterConfigSave: {
 		"Save", "保存", "儲存", "저장", "保存", "Сохранить", "Enregistrer",
+	},
+	xMeterEnabled: {
+		"Fetch this quota", "获取此服务的额度", "取得此服務的額度", "이 서비스의 할당량 가져오기", "このサービスのクォータを取得",
+		"Получать квоту этого сервиса", "Récupérer ce quota",
+	},
+	xMeterDisabledNote: {
+		"Turned off: Quosparr reads no credential for this service, sends no request and reports it as not configured.",
+		"已停用：Quosparr 不读取此服务的凭据、不发送请求，并将其显示为未配置。",
+		"已停用：Quosparr 不讀取此服務的憑證、不傳送請求，並將其顯示為未設定。",
+		"꺼짐: Quosparr는 이 서비스의 자격 증명을 읽지 않고 요청을 보내지 않으며 미구성으로 표시합니다.",
+		"オフ：Quosparr はこのサービスの認証情報を読まず、リクエストも送らず、未設定として表示します。",
+		"Отключено: Quosparr не читает учётные данные этого сервиса, не отправляет запросы и показывает его как ненастроенный.",
+		"Désactivé : Quosparr ne lit aucun identifiant de ce service, n'envoie aucune requête et l'affiche comme non configuré.",
 	},
 	xMeterConfigNotConfigured: {
 		"Not configured", "未配置", "未設定", "구성되지 않음", "未設定", "Не настроено", "Non configuré",

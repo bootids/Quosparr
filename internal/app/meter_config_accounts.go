@@ -60,6 +60,31 @@ func (d *meterConfigDraft) clearFor(p store.Provider) {
 	d.err = ""
 }
 
+// renderMeterEnabledSwitch is the on/off switch at the top of a quota
+// provider tab. Turning it off stops credential discovery and fetching; the
+// saved configuration stays, so turning it back on resumes as before.
+func renderMeterEnabledSwitch(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp, p store.Provider) {
+	l := u.L()
+	root := platform.RunwayDir(rt.home)
+	off, err := meter.IsDisabled(root, string(p))
+	on := !off
+	if ui.Switch(c.Key("meter-enabled-"+string(p)), &on).Label(tx(l, xMeterEnabled)).Disabled(f.busy || err != nil).Changed() {
+		u.accountAct(f, "", func() string {
+			if err := meter.SetDisabled(root, string(p), !on); err != nil {
+				return l.Text(l10n.KeyStatusError)
+			}
+			rt.refreshMeter(p)
+			return ""
+		})
+	}
+	switch {
+	case err != nil:
+		ui.Text(c, tx(l, xMeterConfigReadFailed)).FontSize(12).TextColor(c.Theme().Danger)
+	case off:
+		dimText(c, tx(l, xMeterDisabledNote))
+	}
+}
+
 // renderCursorConfig is the Cursor tab: the resolved session (token saved
 // here first, then Cursor's own login) and the token editor.
 func renderCursorConfig(c *ui.Context, u *settingsUI, f *accountForm, rt *liveApp) {

@@ -11,6 +11,9 @@ import (
 func (s *Service) quotaReportLocked(snap Snapshot, now time.Time) *export.QuotaReport {
 	r := &export.QuotaReport{SchemaVersion: export.QuotaSchemaVersion,
 		GeneratedAt: now.UTC(), Providers: map[string]export.QuotaProvider{}}
+	if sec := int(s.refreshInterval() / time.Second); sec > 0 {
+		r.RefreshIntervalSeconds = &sec
+	}
 	c := export.QuotaProvider{Status: "loading"}
 	switch {
 	case snap.Codex.APIKeyMode:

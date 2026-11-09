@@ -23,6 +23,7 @@ CLI 输出独立版本化 JSON；同一份数据保存在 `~/.quosparr/status.js
 {
   "schema_version": 1,
   "generated_at": "2026-10-20T12:00:00Z",
+  "refresh_interval_seconds": 300,
   "providers": {
     "kimi": {
       "status": "ok",
@@ -42,10 +43,11 @@ CLI 输出独立版本化 JSON；同一份数据保存在 `~/.quosparr/status.js
 ```
 
 - `providers` 按 ID 索引：`codex`、`grok`、`claude`、`cursor`、`kimi`、`zai`、`agy`、`deepseek`、`minimax`、`pixellab`、`elevenlabs`。不指定名称时包含全部，含未配置状态；不支持 MiMo。
+- 在设置的账号页签里关闭“获取此服务的额度”的配额 provider 不读凭据、不发请求，导出为 `not_configured`；停用列表保存在 `~/.quosparr/meter-disabled.json`（非密钥，`0600`）。
 - 只导出当前账号，不包含其他托管账号。Codex/Claude API 账号为 `unsupported`，不把 API 余额伪装成订阅额度。
 - `status` 为 `ok`、`stale`、`error`、`not_configured`、`loading` 或 `unsupported`。只有 `ok` 可作额度决策依据。
 - `fetched_at` 是最后成功抓取时间；CLI 在查询时计算 `age_seconds`。`generated_at` 是源报告生成时间，不是查询时间。时间带时区，文件通常为 UTC 秒精度。
-- `--max-age` 为正整数秒，默认 900。抓取时间或导出时间超过上限、时间戳缺失、时钟超前超过 1 分钟、任一窗口重置时间已到，均标记 `stale`。旧数值保留供诊断，不推断已补满额度。
+- `--max-age` 为正整数秒，默认为报告中 `refresh_interval_seconds`（应用刷新间隔）的 2 倍；旧版导出没有该字段时默认 900。抓取时间或导出时间超过上限、时间戳缺失、时钟超前超过 1 分钟、任一窗口重置时间已到，均标记 `stale`。旧数值保留供诊断，不推断已补满额度。
 - `error` 仅为固定代码：`fetch_failed`、`missing_timestamp`、`clock_skew`、`max_age_exceeded`、`reset_elapsed`；不含上游正文或认证错误原文。最后抓取失败但仍有成功值时为 `stale`，无成功值时为 `error`。
 - `limits` 的 `used_percent` 为已用百分比；`used`、`limit`、`remaining` 是可选原始数值，按 `unit` 解释。未知值省略，不补成零。八家配额 provider 保留业务数值精度；Grok/Claude 为现有面板的整数百分比。
 - `duration_seconds` 未知时为零或省略，不从标题猜周期。`resets_at` 未知时省略。窗口没有重置时间不代表无限额度。

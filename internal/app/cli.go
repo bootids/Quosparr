@@ -30,7 +30,8 @@ Options:
 
   --quota [--status-file PATH] [--max-age SECONDS] [provider ...]
       Print versioned quota JSON from the status export and exit. No network.
-      Requires Export status JSON; max-age defaults to 900 seconds.
+      Requires Export status JSON; max-age defaults to twice the refresh
+      interval (900 seconds for exports that do not record it).
 
 `
 

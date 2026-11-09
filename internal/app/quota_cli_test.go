@@ -76,3 +76,38 @@ func TestReadQuotaRejectsOldOrMalformedExportWithoutEcho(t *testing.T) {
 		}
 	}
 }
+
+func TestReadQuotaDefaultMaxAgeFollowsRefreshInterval(t *testing.T) {
+	now := time.Now().UTC()
+	fetched := now.Add(-8 * time.Minute)
+	for _, tc := range []struct {
+		interval int
+		args     []string
+		want     string
+	}{
+		{300, nil, "ok"},    // 8 min < 2×5 min
+		{120, nil, "stale"}, // 8 min > 2×2 min
+		{0, nil, "ok"},      // no interval recorded: 900s
+		{300, []string{"--max-age", "300"}, "stale"}, // explicit flag wins
+	} {
+		path := filepath.Join(t.TempDir(), "status.json")
+		r := &export.QuotaReport{SchemaVersion: 1, GeneratedAt: now,
+			Providers: map[string]export.QuotaProvider{"codex": {Status: "ok", FetchedAt: &fetched}}}
+		if tc.interval > 0 {
+			r.RefreshIntervalSeconds = &tc.interval
+		}
+		st := export.StatusSnapshot{GeneratedAt: now, QuotaReport: r}
+		if err := (export.StatusExporter{Path: path}).Save(st); err != nil {
+			t.Fatal(err)
+		}
+		var out, stderr bytes.Buffer
+		args := append([]string{"--status-file", path}, tc.args...)
+		if code := ReadQuota(&out, &stderr, t.TempDir(), args, now); code != 0 {
+			t.Fatalf("%d %v: code %d, %q", tc.interval, tc.args, code, stderr.String())
+		}
+		var got export.QuotaReport
+		if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.Providers["codex"].Status != tc.want {
+			t.Fatalf("%d %v: status %q, want %q (%v)", tc.interval, tc.args, got.Providers["codex"].Status, tc.want, err)
+		}
+	}
+}

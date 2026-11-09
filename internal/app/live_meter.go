@@ -41,6 +41,10 @@ type meterModule struct {
 	// detect reports whether a credential is currently present; it never
 	// touches the network.
 	detect func(ctx context.Context) bool
+	// disabled reports whether the user turned the provider off; a disabled
+	// provider reads no credential, sends no request and reports not
+	// configured. nil means it can never be disabled.
+	disabled func() (bool, error)
 	// provider is the history key this module's pool samples are recorded
 	// under.
 	provider store.Provider
@@ -96,6 +100,18 @@ func (m *meterModule) State(now time.Time) runway.MeterState {
 func (m *meterModule) Refresh(ctx context.Context) error {
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
+	if off, err := m.isDisabled(); err != nil || off {
+		raw := meter.NotConfigured()
+		if err != nil {
+			raw = meter.Failed(meter.StatusParse, string(m.provider)+": read disabled providers failed")
+		}
+		m.mu.Lock()
+		m.raw, m.loaded = raw, true
+		m.speed, m.speedErr = nil, ""
+		m.mu.Unlock()
+		m.fire()
+		return nil
+	}
 	raw := m.fetch(ctx)
 	m.mu.Lock()
 	m.raw = raw
@@ -145,7 +161,8 @@ func (m *meterModule) RefreshLocal(ctx context.Context) error {
 	}
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
-	if m.detect(ctx) {
+	off, err := m.isDisabled()
+	if err != nil || (!off && m.detect(ctx)) {
 		return nil
 	}
 	m.mu.Lock()
@@ -159,6 +176,13 @@ func (m *meterModule) RefreshLocal(ctx context.Context) error {
 		m.fire()
 	}
 	return nil
+}
+
+func (m *meterModule) isDisabled() (bool, error) {
+	if m.disabled == nil {
+		return false, nil
+	}
+	return m.disabled()
 }
 
 // SetOnChange stores the callback; it is invoked after every state change
@@ -621,6 +645,7 @@ func newMeterModules(home string, prefs store.Preferences, langs []string) (map[
 	meters := make(map[store.Provider]runway.MeterProvider, len(mods))
 	for p, m := range mods {
 		m.provider = p
+		m.disabled = func() (bool, error) { return meter.IsDisabled(root, string(p)) }
 		m.history = hist
 		meters[p] = m
 	}

@@ -17,8 +17,8 @@ func ReadQuota(out, stderr io.Writer, home string, args []string, now time.Time)
 	fs := flag.NewFlagSet("quosparr --quota", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	path := fs.String("status-file", export.DefaultStatusPath(home), "")
-	maxAge := fs.Int("max-age", 900, "")
-	if err := fs.Parse(args); err != nil || *maxAge <= 0 || int64(*maxAge) > int64((1<<63-1)/time.Second) {
+	maxAge := fs.Int("max-age", 0, "")
+	if err := fs.Parse(args); err != nil || *maxAge < 0 || (*maxAge == 0 && maxAgeSet(fs)) || int64(*maxAge) > int64((1<<63-1)/time.Second) {
 		fmt.Fprintln(stderr, "quota: use --quota [--status-file PATH] [--max-age SECONDS] [provider ...]; max-age must be positive")
 		return 2
 	}
@@ -42,7 +42,11 @@ func ReadQuota(out, stderr io.Writer, home string, args []string, now time.Time)
 		fmt.Fprintln(stderr, "quota: invalid or unsupported quota report; update Quosparr and refresh its status export")
 		return 1
 	}
-	r := st.QuotaReport.At(now, time.Duration(*maxAge)*time.Second)
+	limit := time.Duration(*maxAge) * time.Second
+	if *maxAge == 0 {
+		limit = st.QuotaReport.DefaultMaxAge()
+	}
+	r := st.QuotaReport.At(now, limit)
 	if names := fs.Args(); len(names) > 0 {
 		selected := make(map[string]export.QuotaProvider, len(names))
 		for _, name := range names {
@@ -62,4 +66,11 @@ func ReadQuota(out, stderr io.Writer, home string, args []string, now time.Time)
 		return 1
 	}
 	return 0
+}
+
+// maxAgeSet reports whether --max-age was given explicitly.
+func maxAgeSet(fs *flag.FlagSet) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == "max-age" })
+	return set
 }
